@@ -575,6 +575,30 @@ class RinApp(ctk.CTk):
         except Exception as exc:
             log.debug("Ajuste Win32 borderless ignorado: %s", exc)
 
+    def _get_screen_work_area(self) -> tuple[int, int, int, int]:
+        """Retorna (left, top, width, height) da área útil da tela excluindo a barra de tarefas.
+        Funciona com precisão em qualquer resolução (1080p, 1440p, 4K, 720p/laptops) e escalas de DPI."""
+        try:
+            class RECT(ctypes.Structure):
+                _fields_ = [
+                    ("left", ctypes.c_long),
+                    ("top", ctypes.c_long),
+                    ("right", ctypes.c_long),
+                    ("bottom", ctypes.c_long),
+                ]
+
+            rect = RECT()
+            if ctypes.windll.user32.SystemParametersInfoW(0x0030, 0, ctypes.byref(rect), 0):
+                w = max(400, int(rect.right - rect.left))
+                h = max(300, int(rect.bottom - rect.top))
+                return int(rect.left), int(rect.top), w, h
+        except Exception as exc:
+            log.debug("Fallback de área útil: %s", exc)
+
+        sw = self.winfo_screenwidth()
+        sh = self.winfo_screenheight()
+        return 0, 0, sw, max(300, sh - 60)
+
     def _enter_mascot_mode(self) -> None:
         if self._mascot_mode:
             return
@@ -617,13 +641,13 @@ class RinApp(ctk.CTk):
         # Exibe a pílula compacta de controles (Mover, -/+, Mic, Voz, Chat, Janela) sob os pés da Miku
         self.mascot_drag_bar.grid(row=2, column=0, sticky="ew", padx=6, pady=(2, 4))
 
-        mascot_w = max(250, int(340 * self._mascot_scale))
-        mascot_h = max(350, int(510 * self._mascot_scale))
-        screen_w = self.winfo_screenwidth()
-        screen_h = self.winfo_screenheight()
-        # Posiciona no canto inferior direito, logo acima da barra de tarefas (evitando cobrir relógio e data)
-        pos_x = max(20, screen_w - mascot_w - 30)
-        pos_y = max(20, screen_h - mascot_h - 68)
+        mascot_w = max(240, int(340 * self._mascot_scale))
+        mascot_h = max(340, int(510 * self._mascot_scale))
+        left, top, work_w, work_h = self._get_screen_work_area()
+
+        # Posiciona no canto inferior direito acima da barra de tarefas para qualquer resolução (1080p, 1440p, 4K, laptops)
+        pos_x = left + max(10, work_w - mascot_w - 24)
+        pos_y = top + max(10, work_h - mascot_h - 12)
 
         self.minsize(240, 320)
         self.attributes("-topmost", True)
@@ -686,19 +710,22 @@ class RinApp(ctk.CTk):
         self.main_area.configure(fg_color="transparent")
         self.minsize(920, 580)
 
-        # Centraliza a janela no meio da tela ao voltar do modo mascote
-        win_w, win_h = 1280, 780
+        # Centraliza a janela no meio da tela ao voltar do modo mascote (respeitando resolução da tela)
+        left, top, work_w, work_h = self._get_screen_work_area()
+
+        win_w = min(1280, max(920, int(work_w * 0.90)))
+        win_h = min(780, max(560, int(work_h * 0.90)))
         try:
             dim_part = self._saved_geometry.split("+")[0]
             w_str, h_str = dim_part.split("x")
-            win_w, win_h = max(920, int(w_str)), max(580, int(h_str))
+            saved_w, saved_h = int(w_str), int(h_str)
+            if 800 <= saved_w <= work_w and 500 <= saved_h <= work_h:
+                win_w, win_h = saved_w, saved_h
         except Exception:
             pass
 
-        screen_w = self.winfo_screenwidth()
-        screen_h = self.winfo_screenheight()
-        center_x = max(0, (screen_w - win_w) // 2)
-        center_y = max(0, (screen_h - win_h) // 2)
+        center_x = left + max(0, (work_w - win_w) // 2)
+        center_y = top + max(0, (work_h - win_h) // 2)
         self.geometry(f"{win_w}x{win_h}+{center_x}+{center_y}")
 
         self.mascot_drag_bar.grid_remove()
