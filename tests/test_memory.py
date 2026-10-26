@@ -351,3 +351,17 @@ def test_router_reply_contains_saved_memories(persona: Persona, temp_store: Memo
     assert len(reply.saved_memories) == 1
     assert reply.saved_memories[0].content == "Gosta de música rock"
     assert reply.saved_memories[0].category == "preferencia"
+
+
+def test_save_and_load_api_credentials(tmp_path: Path):
+    from src.core.settings import load_settings, save_api_credentials
+    env_file = tmp_path / ".env"
+    save_api_credentials(api_key="AIzaSyTestKey1234567890", model="gemini-2.5-flash", env_file=env_file)
+    content = env_file.read_text(encoding="utf-8")
+    assert "GEMINI_API_KEY=AIzaSyTestKey1234567890" in content
+    assert "GEMINI_MODEL=gemini-2.5-flash" in content
+
+    settings = load_settings(env_file=env_file)
+    assert settings.api_key == "AIzaSyTestKey1234567890"
+    assert settings.model == "gemini-2.5-flash"
+    assert settings.has_api_key is True

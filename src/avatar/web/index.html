@@ -357,6 +357,12 @@
       let dragMovedPixels = 0;
       let dragStartScreenX = 0;
       let dragStartScreenY = 0;
+      let isDraggingModel = false;
+      let modelDragMoved = 0;
+      let dragStartClientX = 0;
+      let dragStartClientY = 0;
+      let initialOffsetX = 0.0;
+      let initialOffsetY = 0.0;
 
       // Parâmetros interpolados a 60 FPS
       // Nos modelos Project Sekai (sekai4), os dois braços (L e R) têm a MESMA convenção de sinal
@@ -1287,6 +1293,17 @@
           }
           return;
         }
+
+        if (isDraggingModel) {
+          const dx = ev.clientX - dragStartClientX;
+          const dy = ev.clientY - dragStartClientY;
+          modelDragMoved = Math.max(modelDragMoved, Math.abs(dx) + Math.abs(dy));
+          userOffsetX = Math.max(-450, Math.min(450, initialOffsetX + dx));
+          userOffsetY = Math.max(-500, Math.min(500, initialOffsetY + dy));
+          fitModelToStage();
+          return;
+        }
+
         const rect = canvas.getBoundingClientRect();
         if (rect.width <= 0 || rect.height <= 0) return;
         const x = (ev.clientX - rect.left) / rect.width;
@@ -1304,16 +1321,40 @@
           if (wasClick) {
             triggerAction("acenar");
           }
+          return;
+        }
+
+        if (isDraggingModel) {
+          const wasClick = modelDragMoved <= 5;
+          isDraggingModel = false;
+          if (wasClick) {
+            triggerAction("acenar");
+            if (currentModel) {
+              try {
+                const rect = canvas.getBoundingClientRect();
+                currentModel.tap(dragStartClientX - rect.left, dragStartClientY - rect.top);
+              } catch (_e) {}
+            }
+          } else {
+            postToHost({
+              type: "transform_changed",
+              offsetX: Math.round(userOffsetX),
+              offsetY: Math.round(userOffsetY),
+              zoom: Number(userZoom.toFixed(2))
+            });
+          }
         }
       });
 
       window.addEventListener("pointerleave", function () {
         pointerActive = false;
         isDraggingMascot = false;
+        isDraggingModel = false;
       });
 
       canvas.addEventListener("pointerdown", function (ev) {
-        if (isMascotMode && ev.button === 0) {
+        if (ev.button !== 0 && ev.button !== 2) return;
+        if (isMascotMode) {
           isDraggingMascot = true;
           dragMovedPixels = 0;
           dragStartScreenX = ev.screenX;
@@ -1328,11 +1369,16 @@
           });
           return;
         }
-        triggerAction("acenar");
-        if (!currentModel) return;
+
+        // Modo Janela: mover e arrastar a Miku para cima/baixo/lados livremente
+        isDraggingModel = true;
+        modelDragMoved = 0;
+        dragStartClientX = ev.clientX;
+        dragStartClientY = ev.clientY;
+        initialOffsetX = userOffsetX;
+        initialOffsetY = userOffsetY;
         try {
-          const rect = canvas.getBoundingClientRect();
-          currentModel.tap(ev.clientX - rect.left, ev.clientY - rect.top);
+          canvas.setPointerCapture(ev.pointerId);
         } catch (_e) {}
       });
 
@@ -1348,9 +1394,22 @@
           postToHost({ type: "mascot_scale", delta: ev.deltaY < 0 ? 1 : -1 });
           return;
         }
-        const delta = ev.deltaY < 0 ? 0.07 : -0.07;
-        userZoom = Math.min(2.2, Math.max(0.45, userZoom + delta));
-        fitModelToStage();
+        if (ev.shiftKey) {
+          // Shift + Scroll move verticalmente
+          userOffsetY = Math.max(-500, Math.min(500, userOffsetY + (ev.deltaY < 0 ? 30 : -30)));
+          fitModelToStage();
+        } else {
+          // Scroll normal dá zoom
+          const delta = ev.deltaY < 0 ? 0.08 : -0.08;
+          userZoom = Math.min(2.8, Math.max(0.40, userZoom + delta));
+          fitModelToStage();
+        }
+        postToHost({
+          type: "transform_changed",
+          offsetX: Math.round(userOffsetX),
+          offsetY: Math.round(userOffsetY),
+          zoom: Number(userZoom.toFixed(2))
+        });
       }, { passive: false });
 
       window.addEventListener("resize", function () {

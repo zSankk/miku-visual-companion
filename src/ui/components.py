@@ -1417,9 +1417,9 @@ class ModelsStudioPanel(ctk.CTkScrollableFrame):
         )
         self.zoom_slider = ctk.CTkSlider(
             sliders_card,
-            from_=0.50,
-            to=2.00,
-            number_of_steps=60,
+            from_=0.40,
+            to=2.80,
+            number_of_steps=80,
             progress_color=theme.ACCENT,
             command=self._on_zoom_changed,
         )
@@ -1435,9 +1435,9 @@ class ModelsStudioPanel(ctk.CTkScrollableFrame):
         )
         self.pos_x_slider = ctk.CTkSlider(
             sliders_card,
-            from_=-180.0,
-            to=180.0,
-            number_of_steps=72,
+            from_=-400.0,
+            to=400.0,
+            number_of_steps=80,
             progress_color=theme.ACCENT,
             command=self._on_pos_x_changed,
         )
@@ -1453,9 +1453,9 @@ class ModelsStudioPanel(ctk.CTkScrollableFrame):
         )
         self.pos_y_slider = ctk.CTkSlider(
             sliders_card,
-            from_=-180.0,
-            to=180.0,
-            number_of_steps=72,
+            from_=-500.0,
+            to=500.0,
+            number_of_steps=100,
             progress_color=theme.ACCENT,
             command=self._on_pos_y_changed,
         )
@@ -1579,6 +1579,15 @@ class ModelsStudioPanel(ctk.CTkScrollableFrame):
     def refresh_models_gallery(self) -> None:
         if hasattr(self, "_detail_labels"):
             self._detail_labels.clear()
+        if hasattr(self, "zoom_slider"):
+            self.zoom_slider.set(self.avatar.settings.zoom)
+            self.zoom_val_lbl.configure(text=f"{self.avatar.settings.zoom:.2f}x")
+        if hasattr(self, "pos_x_slider"):
+            self.pos_x_slider.set(self.avatar.settings.offset_x)
+            self.pos_x_lbl.configure(text=f"{self.avatar.settings.offset_x:+.0f} px")
+        if hasattr(self, "pos_y_slider"):
+            self.pos_y_slider.set(self.avatar.settings.offset_y)
+            self.pos_y_lbl.configure(text=f"{self.avatar.settings.offset_y:+.0f} px")
         for child in self.models_list_frame.winfo_children():
             child.destroy()
 
@@ -1739,3 +1748,4 @@ class ModelsStudioPanel(ctk.CTkScrollableFrame):
 
 # Re-export do painel de memória e armazenamento
 from src.ui.memory_panel import EditFactDialog, FactCard, MemoryPanel
+from src.ui.api_key_dialog import ApiKeyDialog

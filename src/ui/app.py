@@ -13,11 +13,12 @@ import customtkinter as ctk
 from src.avatar.live2d_widget import Live2DAvatarController, Live2DAvatarWidget
 from src.avatar.vtube_studio import VTubeStudioController
 from src.core.persona import PersonaError, load_persona
-from src.core.router import ConversationRouter, RouterReply
-from src.core.settings import Settings
+from src.core.router import ConversationRouter, RouterReply, create_brain
+from src.core.settings import Settings, load_settings
 from src.core.state import AgentState, Mode
 from src.ui import theme
 from src.ui.components import (
+    ApiKeyDialog,
     ChatPanel,
     MemoryPanel,
     MessageBubble,
@@ -144,7 +145,7 @@ class RinApp(ctk.CTk):
         self.sidebar.grid(row=0, column=0, sticky="nsw")
         self.sidebar.grid_propagate(False)
         self.sidebar.grid_columnconfigure(0, weight=1)
-        self.sidebar.grid_rowconfigure(7, weight=1)
+        self.sidebar.grid_rowconfigure(8, weight=1)
 
         ctk.CTkLabel(
             self.sidebar, text=self.router.persona.name, text_color=theme.ACCENT,
@@ -224,13 +225,29 @@ class RinApp(ctk.CTk):
         )
         self.avatar_toggle_btn.grid(row=6, column=0, sticky="ew", padx=14, pady=(6, 0))
 
+        self.api_key_btn = ctk.CTkButton(
+            self.sidebar,
+            text="🔑 Chave de API (Gemini)",
+            height=34,
+            corner_radius=10,
+            fg_color=theme.BG_CARD,
+            border_width=1,
+            border_color=theme.BORDER,
+            hover_color=theme.BORDER,
+            text_color=theme.TEXT_PRIMARY,
+            font=ctk.CTkFont(theme.FONT_FAMILY, 11, "bold"),
+            command=self._open_api_key_dialog,
+        )
+        self.api_key_btn.grid(row=7, column=0, sticky="ew", padx=14, pady=(6, 0))
+
         brain_name = getattr(self.router.brain, "name", "?")
         self.footer = ctk.CTkLabel(
             self.sidebar, text=f"Cérebro: {brain_name}\nAtalhos: Ctrl+N nova sessão · Ctrl+D modo",
             text_color=theme.TEXT_MUTED, justify="left", anchor="w", wraplength=250,
-            font=ctk.CTkFont(theme.FONT_FAMILY, 11),
+            font=ctk.CTkFont(theme.FONT_FAMILY, 11), cursor="hand2",
         )
-        self.footer.grid(row=8, column=0, sticky="sw", padx=20, pady=12)
+        self.footer.grid(row=9, column=0, sticky="sw", padx=20, pady=12)
+        self.footer.bind("<Button-1>", lambda e: self._open_api_key_dialog())
 
         # -------------------------------------------------------------- main
         self.main_area = ctk.CTkFrame(self, fg_color="transparent")
@@ -816,6 +833,25 @@ class RinApp(ctk.CTk):
         self.mic.set_device(device_index)
         self.voice_settings.device_index = device_index
         self.voice_settings.save()
+
+    def _open_api_key_dialog(self) -> None:
+        ApiKeyDialog(
+            self,
+            settings=self.settings,
+            on_saved=self._on_api_credentials_saved,
+        )
+
+    def _on_api_credentials_saved(self, key: str, model: str) -> None:
+        self.settings = load_settings()
+        self.router.brain = create_brain(self.settings, self.router.persona)
+        brain_name = getattr(self.router.brain, "name", "?")
+        self.footer.configure(
+            text=f"Cérebro: {brain_name}\nAtalhos: Ctrl+N nova sessão · Ctrl+D modo"
+        )
+        if self.settings.has_api_key:
+            self.chat.add_system(f"✔ Chave GEMINI_API_KEY ativada com sucesso! Cérebro ativo: {brain_name}")
+        else:
+            self.chat.add_system("Chave desativada: operando no modo offline (simulado).")
 
     def _open_voice_settings(self) -> None:
         VoiceSettingsDialog(
