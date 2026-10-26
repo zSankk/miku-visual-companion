@@ -64,7 +64,14 @@ O script irá automaticamente:
 - Verificar sua instalação do Python.
 - Criar o ambiente virtual isolado (`.venv`).
 - Atualizar o `pip` e instalar todas as dependências (`requirements.txt`).
+- Baixar os pesos da voz da Miku (RVC local, ~930 MB, só na primeira vez) em `data/models/miku_rvc/`.
 - Gerar o arquivo de configuração `.env` inicial.
+
+> 🎤 **Voz da Miku:** sem esses pesos o app funciona, mas fala com a voz reserva do Edge-TTS (`pt-BR-FranciscaNeural`). Se o download falhar ou for interrompido, rode o `setup.bat` de novo, ou apenas:
+> ```bat
+> .venv\Scripts\python.exe scripts\download_miku_models.py
+> ```
+> O script baixa **somente pesos** (nenhum código), em versões fixas, e confere o SHA-256 de cada arquivo antes de instalar. Em PCs sem GPU NVIDIA a voz é gerada pela CPU e cada frase pode levar alguns segundos.
 
 #### 3. Iniciar a Aplicação (`run.bat`)
 Dê um duplo clique em **`run.bat`**:
