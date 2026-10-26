@@ -22,6 +22,10 @@ Todas as alterações notáveis deste projeto serão documentadas neste arquivo,
   - Interruptor de modo privado (amnésia temporária) e botão "Nova Sessão" com resumo inteligente em 1 frase gerado pela IA.
 - **🔑 Gerenciador de Chave de API no Aplicativo**:
   - Modal para visualizar, inserir ou alterar a `GEMINI_API_KEY` e selecionar o modelo ativo diretamente dentro do aplicativo, persistindo no arquivo `.env`.
+- **📦 Instalação Inteligente & Portabilidade Windows LTSC (PR #1 + LTSC Proof)**:
+  - Download automático e instalação silenciosa do Python 3.12 (64-bit) com adição ao PATH caso o Python não esteja presente na máquina (comum em Windows LTSC sem winget/Microsoft Store).
+  - Script seguro para download e verificação dos pesos de voz RVC da Miku (`scripts/download_miku_models.py`) com versões fixas no Hugging Face e checagem de integridade SHA-256.
+  - Criação automática do atalho **Miku Visual Companion** na Área de Trabalho do Windows.
 
 ---
 
@@ -40,6 +44,10 @@ Todas as alterações notáveis deste projeto serão documentadas neste arquivo,
 ---
 
 ### 🛠️ Correções de Bugs
+- **Fechamento Prematuro de `setup.bat` e `run.bat` (PR #1)**:
+  - Remoção de caracteres acentuados, emojis e `chcp 65001`, mantendo ASCII estrito para evitar falha no parser do `cmd.exe`.
+  - Eliminação de parênteses em blocos `if`, substituídos por rótulos e comandos `goto` para garantir que o console sempre pause em caso de erro.
+  - Criação do arquivo [`.gitattributes`](.gitattributes) forçando quebras de linha CRLF para todos os arquivos `.bat`.
 - **Erro de Inicialização com CTkFont (`bad -weight value 'italic' / 'underline'`)**:
   - Correção na sintaxe de fontes do CustomTkinter/Tkinter onde estilos eram passados como terceiro argumento posicional em vez de argumentos nomeados (`slant="italic"`, `underline=True`).
 - **Erro no Teste de Microfone (`paBadIODeviceCombination` -9993)**:
