@@ -101,7 +101,7 @@ class RinApp(ctk.CTk):
         self._busy = False
         self._typing_job: str | None = None
 
-        self.title(f"{router.persona.name} · Virtual Companion")
+        self.title(f"{router.persona.name} · Virtual Companion (Fan Project)")
         self.geometry("1280x780")
         self.minsize(920, 580)
 
@@ -152,7 +152,7 @@ class RinApp(ctk.CTk):
             font=ctk.CTkFont(theme.FONT_FAMILY, 34, "bold"), anchor="w",
         ).grid(row=0, column=0, sticky="w", padx=20, pady=(18, 0))
         ctk.CTkLabel(
-            self.sidebar, text="Virtual Companion · Desktop", text_color=theme.TEXT_MUTED,
+            self.sidebar, text="Virtual Companion · Projeto de Fã", text_color=theme.TEXT_MUTED,
             font=ctk.CTkFont(theme.FONT_FAMILY, 12), anchor="w",
         ).grid(row=1, column=0, sticky="w", padx=20, pady=(0, 12))
 

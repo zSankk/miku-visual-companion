@@ -1,5 +1,10 @@
 # 🎤 Miku Visual Companion
 
+> ⚠️ **Projeto Não-Comercial de Fã (Fan-Made / Non-Profit Open Source):**
+> Este é um projeto de código aberto sem fins lucrativos, desenvolvido exclusivamente por fãs para fins de estudo, aprendizado e entretenimento pessoal. Este software **não é oficial** e não possui nenhuma afiliação, patrocínio ou endosso da **Crypton Future Media, INC.**, **SEGA Corporation** ou **Colorful Palette Inc.**.
+
+---
+
 Assistente Virtual Inteligente de Desktop com **Hatsune Miku**, combinando **IA Generativa Gemini Flash-Lite**, **Avatar Live2D Cubism 4 (Projeto Sekai)** embutido, **Voz Vocaloid/Anime (RVC Local + Fallback Edge-TTS)**, **Reconhecimento de Voz 100% Local (Faster-Whisper)**, **Memória Persistente SQLite** e **Modo Mascote Transparente** no canto da tela.
 
 ---
@@ -97,3 +102,11 @@ Você pode ativar a IA do Gemini em segundos direto pela interface gráfica:
 - **Chaves de API e Segredos**: Arquivos `.env` e chaves privadas nunca são versionados no repositório ([`.gitignore`](.gitignore)).
 - **Privacidade de Áudio**: A voz do seu microfone é transcrita 100% localmente pelo Faster-Whisper na sua CPU/GPU, sem upload de áudio para servidores externos.
 - **Código Aberto e Modular**: Arquitetura desacoplada em `src/core`, `src/avatar`, `src/voice`, `src/memory` e `src/ui`.
+
+---
+
+## ⚖️ Aviso Legal & Propriedade Intelectual (Disclaimer)
+
+- **Hatsune Miku (初音ミク)** é uma personagem e software de síntese vocal de titularidade de **Crypton Future Media, INC.** (札幌市中央区). Este projeto é uma obra derivada não comercial criada por fãs em conformidade com as diretrizes da [Piapro Character License (PCL)](https://piapro.jp/license/pcl/summary) e os termos de uso de personagens para fins não lucrativos da Crypton.
+- **Modelos e Assets Visuais (Project SEKAI: Colorful Stage!)**: Todos os designs de personagens, malhas de modelos Live2D Cubism e elementos visuais pertencem a **SEGA Corporation**, **Colorful Palette Inc.** e **Crypton Future Media, INC.**. O uso aqui tem finalidade exclusivamente recreativa, educacional e sem fins comerciais.
+- **Gratuidade Absoluta**: Este software é e sempre será 100% gratuito e de código aberto. É expressamente proibida qualquer comercialização, venda, inclusão de anúncios monetizados ou cobrança de qualquer natureza associada a este projeto.
