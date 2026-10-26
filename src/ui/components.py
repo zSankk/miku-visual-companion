@@ -113,13 +113,38 @@ class StatusPanel(ctk.CTkFrame):
 # =============================================================================
 class MessageBubble(ctk.CTkFrame):
     def __init__(self, master, role: str, text: str, emotion: str | None = None,
-                 rin_name: str = "Rin", wraplength: int = 520) -> None:
+                 rin_name: str = "Rin", wraplength: int = 520,
+                 memory_saved: str | None = None) -> None:
         is_user = role == "user"
         is_error = role == "error"
         bg = theme.BUBBLE_USER if is_user else theme.BUBBLE_ERROR if is_error else theme.BUBBLE_RIN
         super().__init__(master, fg_color=bg, corner_radius=14)
         self.role = role
         self.full_text = text
+        self.memory_saved = memory_saved
+
+        # 🧠 Pill estilo ChatGPT quando a Miku salva uma nova memória
+        if memory_saved and not is_user:
+            self.memory_pill = ctk.CTkFrame(
+                self,
+                fg_color="#1e1b4b",
+                corner_radius=8,
+                border_width=1,
+                border_color="#6366f1",
+            )
+            self.memory_pill.pack(fill="x", padx=14, pady=(8, 2))
+            self.memory_lbl = ctk.CTkLabel(
+                self.memory_pill,
+                text=f"🧠 Memória salva: {memory_saved}",
+                text_color="#c7d2fe",
+                font=ctk.CTkFont(theme.FONT_FAMILY, 11, "bold"),
+                anchor="w",
+                justify="left",
+                wraplength=max(200, wraplength - 28),
+                padx=8,
+                pady=4,
+            )
+            self.memory_lbl.pack(fill="x")
 
         if is_user:
             header_text, header_color = "Você", theme.TEXT_MUTED
@@ -133,7 +158,8 @@ class MessageBubble(ctk.CTkFrame):
             self, text=header_text, text_color=header_color, anchor="w",
             font=ctk.CTkFont(theme.FONT_FAMILY, 11, "bold"),
         )
-        self.header.pack(fill="x", padx=14, pady=(8, 0))
+        pady_header = (4, 0) if memory_saved else (8, 0)
+        self.header.pack(fill="x", padx=14, pady=pady_header)
 
         self.body = ctk.CTkLabel(
             self, text=text, text_color=theme.TEXT_PRIMARY, justify="left", anchor="w",
@@ -150,6 +176,8 @@ class MessageBubble(ctk.CTkFrame):
 
     def set_wraplength(self, value: int) -> None:
         self.body.configure(wraplength=value)
+        if hasattr(self, "memory_lbl"):
+            self.memory_lbl.configure(wraplength=max(200, value - 28))
 
     def _copy(self, _event=None) -> None:
         self.clipboard_clear()
@@ -172,6 +200,7 @@ class ChatPanel(ctk.CTkScrollableFrame):
         self._wrap = 520
         # add="+" preserva o bind interno do CTk que atualiza a área de rolagem
         self.bind("<Configure>", self._on_resize, add="+")
+        self._parent_canvas.bind("<MouseWheel>", lambda e: self.after_idle(self.update_idletasks), add="+")
 
     def _on_resize(self, event) -> None:
         wrap = max(240, int(event.width * 0.68))
@@ -180,8 +209,9 @@ class ChatPanel(ctk.CTkScrollableFrame):
             for bubble in self._bubbles:
                 bubble.set_wraplength(wrap)
 
-    def add_message(self, role: str, text: str, emotion: str | None = None) -> MessageBubble:
-        bubble = MessageBubble(self, role, text, emotion, self.rin_name, self._wrap)
+    def add_message(self, role: str, text: str, emotion: str | None = None,
+                    memory_saved: str | None = None) -> MessageBubble:
+        bubble = MessageBubble(self, role, text, emotion, self.rin_name, self._wrap, memory_saved=memory_saved)
         sticky = "e" if role == "user" else "w"
         padx = (80, 12) if role == "user" else (12, 80)
         bubble.grid(row=self._row, column=0, sticky=sticky, padx=padx, pady=6)
@@ -1230,7 +1260,10 @@ class ModelsStudioPanel(ctk.CTkScrollableFrame):
         )
         self.avatar = avatar
         self._on_test_sing_speak = on_test_sing_speak
+        self._detail_labels: list[ctk.CTkLabel] = []
         self.grid_columnconfigure(0, weight=1)
+        self.bind("<Configure>", self._on_resize, add="+")
+        self._parent_canvas.bind("<MouseWheel>", lambda e: self.after_idle(self.update_idletasks), add="+")
 
         # ----------------------------------------------------- Cabeçalho e Importação
         header_card = ctk.CTkFrame(
@@ -1247,7 +1280,7 @@ class ModelsStudioPanel(ctk.CTkScrollableFrame):
             anchor="w",
         ).grid(row=0, column=0, sticky="w", padx=14, pady=(12, 2))
 
-        ctk.CTkLabel(
+        self.header_desc = ctk.CTkLabel(
             header_card,
             text=(
                 "Selecione qualquer modelo em assets/models/ (padrão: Hatsune Miku · Projeto Sekai) "
@@ -1257,30 +1290,29 @@ class ModelsStudioPanel(ctk.CTkScrollableFrame):
             font=ctk.CTkFont(theme.FONT_FAMILY, 11),
             anchor="w",
             justify="left",
-            wraplength=540,
-        ).grid(row=1, column=0, sticky="w", padx=14, pady=(0, 10))
+            wraplength=480,
+        )
+        self.header_desc.grid(row=1, column=0, sticky="w", padx=14, pady=(0, 10))
 
         btn_row = ctk.CTkFrame(header_card, fg_color="transparent")
         btn_row.grid(row=2, column=0, sticky="ew", padx=14, pady=(0, 12))
-        btn_row.grid_columnconfigure(0, weight=2)
-        btn_row.grid_columnconfigure(1, weight=2)
-        btn_row.grid_columnconfigure(2, weight=1)
-        btn_row.grid_columnconfigure(3, weight=1)
+        btn_row.grid_columnconfigure(0, weight=1)
+        btn_row.grid_columnconfigure(1, weight=1)
 
         ctk.CTkButton(
             btn_row,
-            text="📂 Importar Novo Modelo Live2D (.zip)",
+            text="📦 Importar Modelo (.zip)",
             height=34,
             corner_radius=9,
             fg_color=theme.ACCENT,
             hover_color=theme.ACCENT_HOVER,
-            font=ctk.CTkFont(theme.FONT_FAMILY, 12, "bold"),
+            font=ctk.CTkFont(theme.FONT_FAMILY, 11, "bold"),
             command=self._import_zip_or_file,
-        ).grid(row=0, column=0, sticky="ew", padx=(0, 4))
+        ).grid(row=0, column=0, sticky="ew", padx=(0, 4), pady=(0, 4))
 
         ctk.CTkButton(
             btn_row,
-            text="📂 Importar Pasta de Modelo",
+            text="📁 Importar Pasta",
             height=34,
             corner_radius=9,
             fg_color=theme.BG_SIDEBAR,
@@ -1289,11 +1321,11 @@ class ModelsStudioPanel(ctk.CTkScrollableFrame):
             border_color=theme.BORDER,
             font=ctk.CTkFont(theme.FONT_FAMILY, 11, "bold"),
             command=self._import_folder,
-        ).grid(row=0, column=1, sticky="ew", padx=4)
+        ).grid(row=0, column=1, sticky="ew", padx=(4, 0), pady=(0, 4))
 
         ctk.CTkButton(
             btn_row,
-            text="📁 Pasta assets/models",
+            text="📂 Abrir Pasta assets/models",
             height=34,
             corner_radius=9,
             fg_color=theme.BG_SIDEBAR,
@@ -1302,11 +1334,11 @@ class ModelsStudioPanel(ctk.CTkScrollableFrame):
             border_color=theme.BORDER,
             font=ctk.CTkFont(theme.FONT_FAMILY, 11, "bold"),
             command=self._open_models_folder,
-        ).grid(row=0, column=2, sticky="ew", padx=4)
+        ).grid(row=1, column=0, sticky="ew", padx=(0, 4), pady=(4, 0))
 
         ctk.CTkButton(
             btn_row,
-            text="↻ Atualizar",
+            text="↻ Atualizar Galeria",
             height=34,
             corner_radius=9,
             fg_color=theme.BG_SIDEBAR,
@@ -1315,7 +1347,7 @@ class ModelsStudioPanel(ctk.CTkScrollableFrame):
             border_color=theme.BORDER,
             font=ctk.CTkFont(theme.FONT_FAMILY, 11, "bold"),
             command=self.refresh_models_gallery,
-        ).grid(row=0, column=3, sticky="ew", padx=(4, 0))
+        ).grid(row=1, column=1, sticky="ew", padx=(4, 0), pady=(4, 0))
 
         self.feedback_lbl = ctk.CTkLabel(
             header_card,
@@ -1341,7 +1373,7 @@ class ModelsStudioPanel(ctk.CTkScrollableFrame):
             anchor="w",
         ).grid(row=0, column=0, sticky="w", padx=14, pady=(12, 6))
 
-        self.models_list_frame = ctk.CTkFrame(gallery_card, fg_color="transparent")
+        self.models_list_frame = ctk.CTkFrame(gallery_card, fg_color=theme.BG_CARD)
         self.models_list_frame.grid(row=1, column=0, sticky="ew", padx=12, pady=(0, 12))
         self.models_list_frame.grid_columnconfigure(0, weight=1)
 
@@ -1496,15 +1528,16 @@ class ModelsStudioPanel(ctk.CTkScrollableFrame):
             "• Booth.pm / Live2D Official Sample Data / VTube Studio Workshop: qualquer modelo .model3.json ou .model.json "
             "é reconhecido automaticamente!"
         )
-        ctk.CTkLabel(
+        self.guide_lbl = ctk.CTkLabel(
             emote_card,
             text=guide_text,
             text_color=theme.TEXT_MUTED,
             font=ctk.CTkFont(theme.FONT_FAMILY, 11),
             justify="left",
             anchor="w",
-            wraplength=540,
-        ).grid(row=2, column=0, sticky="w", padx=14, pady=(0, 12))
+            wraplength=480,
+        )
+        self.guide_lbl.grid(row=2, column=0, sticky="w", padx=14, pady=(0, 12))
 
         self.refresh_models_gallery()
 
@@ -1529,7 +1562,23 @@ class ModelsStudioPanel(ctk.CTkScrollableFrame):
         val_lbl.grid(row=0, column=1, sticky="e")
         return val_lbl
 
+    def _on_resize(self, event=None) -> None:
+        w = max(240, self.winfo_width() - 36)
+        if hasattr(self, "header_desc"):
+            self.header_desc.configure(wraplength=w)
+        if hasattr(self, "guide_lbl"):
+            self.guide_lbl.configure(wraplength=w)
+        if hasattr(self, "_detail_labels"):
+            card_wrap = max(180, w - 190)
+            for lbl in self._detail_labels:
+                try:
+                    lbl.configure(wraplength=card_wrap)
+                except Exception:
+                    pass
+
     def refresh_models_gallery(self) -> None:
+        if hasattr(self, "_detail_labels"):
+            self._detail_labels.clear()
         for child in self.models_list_frame.winfo_children():
             child.destroy()
 
@@ -1584,14 +1633,17 @@ class ModelsStudioPanel(ctk.CTkScrollableFrame):
                 f"{info.expressions_count} expressões  ·  {physics_tag}\n"
                 f"Arquivo: {info.rel_path}"
             )
-            ctk.CTkLabel(
+            det_lbl = ctk.CTkLabel(
                 card,
                 text=details,
                 text_color=theme.TEXT_MUTED,
                 font=ctk.CTkFont(theme.FONT_FAMILY, 10),
                 justify="left",
                 anchor="w",
-            ).grid(row=1, column=1, sticky="w", padx=(0, 8), pady=(2, 8))
+                wraplength=max(180, int(self.winfo_width() - 200)),
+            )
+            det_lbl.grid(row=1, column=1, sticky="w", padx=(0, 8), pady=(2, 8))
+            self._detail_labels.append(det_lbl)
 
             btn_text = "✓ Em Uso" if is_active else "Carregar Modelo"
             btn_fg = theme.MIC_ON if is_active else theme.ACCENT

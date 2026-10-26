@@ -621,8 +621,9 @@ class RinApp(ctk.CTk):
         mascot_h = max(350, int(510 * self._mascot_scale))
         screen_w = self.winfo_screenwidth()
         screen_h = self.winfo_screenheight()
-        pos_x = max(10, screen_w - mascot_w - 16)
-        pos_y = max(10, screen_h - mascot_h - 48)
+        # Posiciona no canto inferior direito, logo acima da barra de tarefas (evitando cobrir relógio e data)
+        pos_x = max(20, screen_w - mascot_w - 30)
+        pos_y = max(20, screen_h - mascot_h - 68)
 
         self.minsize(240, 320)
         self.attributes("-topmost", True)
@@ -684,7 +685,21 @@ class RinApp(ctk.CTk):
         self.configure(fg_color=theme.BG_APP)
         self.main_area.configure(fg_color="transparent")
         self.minsize(920, 580)
-        self.geometry(self._saved_geometry)
+
+        # Centraliza a janela no meio da tela ao voltar do modo mascote
+        win_w, win_h = 1280, 780
+        try:
+            dim_part = self._saved_geometry.split("+")[0]
+            w_str, h_str = dim_part.split("x")
+            win_w, win_h = max(920, int(w_str)), max(580, int(h_str))
+        except Exception:
+            pass
+
+        screen_w = self.winfo_screenwidth()
+        screen_h = self.winfo_screenheight()
+        center_x = max(0, (screen_w - win_w) // 2)
+        center_y = max(0, (screen_h - win_h) // 2)
+        self.geometry(f"{win_w}x{win_h}+{center_x}+{center_y}")
 
         self.mascot_drag_bar.grid_remove()
         self.mascot_balloon.grid_remove()
@@ -1000,7 +1015,13 @@ class RinApp(ctk.CTk):
             self.avatar.trigger_action(reply.action)
         self._set_agent_state(AgentState.FALANDO)
         self.mascot_bubble_lbl.configure(text=f"💬 {self.router.persona.name}: {reply.text}")
-        bubble = self.chat.add_message("rin", "", reply.emotion)
+        mem_info = None
+        if reply.saved_memories:
+            mem_info = " · ".join(f.content for f in reply.saved_memories)
+            if hasattr(self, "memory_panel"):
+                self.memory_panel.refresh()
+
+        bubble = self.chat.add_message("rin", "", reply.emotion, memory_saved=mem_info)
         bubble.full_text = reply.text
         self._typing_done = False
         self._tts_done = not self.tts.enabled

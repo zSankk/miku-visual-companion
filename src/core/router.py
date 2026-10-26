@@ -20,7 +20,7 @@ from src.core.persona import Persona
 from src.core.settings import Settings
 from src.core.state import Mode
 from src.mcp_bridge.antigravity_bridge import AntigravityBridge
-from src.memory.long_term import MemoryStore
+from src.memory.long_term import Fact, MemoryStore
 from src.memory.session import SessionMemory, Turn
 
 log = logging.getLogger(__name__)
@@ -32,6 +32,7 @@ class RouterReply:
     mode: Mode
     source: str  # quem respondeu (ex.: "Gemini (gemini-2.5-flash)", "Antigravity MCP")
     action: str | None = None
+    saved_memories: tuple[Fact, ...] = ()
 
     @property
     def emotion(self) -> str:
@@ -155,14 +156,16 @@ class ConversationRouter:
                 log.warning("Resposta sem tag de emoção válida: %r", raw[:80])
 
             # Processamento de tags de memória
+            saved_facts: list[Fact] = []
             if self.long_term and self.long_term.enabled and parsed.memories:
                 for mem in parsed.memories:
                     try:
-                        self.long_term.add_fact(
+                        fact = self.long_term.add_fact(
                             content=mem.content,
                             category=mem.category,
                             confidence=mem.confidence,
                         )
+                        saved_facts.append(fact)
                         log.info("Memória salva automaticamente: [%s] %s", mem.category, mem.content)
                     except Exception as exc:
                         log.warning("Não foi possível salvar memória extraída (%s): %s", mem, exc)
@@ -174,7 +177,13 @@ class ConversationRouter:
                 explicit_action=parsed.action,
             )
             self.memory.add_model(parsed.text, parsed.emotion, raw)
-            return RouterReply(parsed=parsed, mode=mode, source=source, action=inferred_action)
+            return RouterReply(
+                parsed=parsed,
+                mode=mode,
+                source=source,
+                action=inferred_action,
+                saved_memories=tuple(saved_facts),
+            )
 
     def _handle_dev_bridge(self, user_text: str) -> tuple[str, str]:  # pragma: no cover - fase MCP
         result = self.bridge.delegate(user_text)

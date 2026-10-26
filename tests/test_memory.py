@@ -342,3 +342,12 @@ def test_export_and_import_backup_json(temp_store: MemoryStore, tmp_path: Path):
     imported_facts = fresh_store.list_facts()
     assert len(imported_facts) == 2
     assert any(f.content == "Primeiro fato" and f.is_pinned for f in imported_facts)
+
+
+def test_router_reply_contains_saved_memories(persona: Persona, temp_store: MemoryStore):
+    brain = MockBrain("[feliz] Ok! [MEMORIA: preferencia | Gosta de música rock | confirmado]")
+    router = ConversationRouter(persona=persona, brain=brain, long_term=temp_store, mode=Mode.CASUAL)
+    reply = router.handle("Eu adoro rock clássico.")
+    assert len(reply.saved_memories) == 1
+    assert reply.saved_memories[0].content == "Gosta de música rock"
+    assert reply.saved_memories[0].category == "preferencia"

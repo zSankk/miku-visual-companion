@@ -355,7 +355,7 @@ class FactCard(ctk.CTkFrame):
         self.del_btn.pack(side="left", padx=2)
 
         # Conteúdo do Fato
-        content_label = ctk.CTkLabel(
+        self.content_label = ctk.CTkLabel(
             self,
             text=fact.content,
             text_color=theme.TEXT_PRIMARY,
@@ -364,7 +364,10 @@ class FactCard(ctk.CTkFrame):
             justify="left",
             anchor="w",
         )
-        content_label.grid(row=1, column=0, columnspan=2, sticky="w", padx=14, pady=(4, 10))
+        self.content_label.grid(row=1, column=0, columnspan=2, sticky="w", padx=14, pady=(4, 10))
+
+    def set_wraplength(self, value: int) -> None:
+        self.content_label.configure(wraplength=max(180, value))
 
 
 # =============================================================================
@@ -387,6 +390,9 @@ class MemoryPanel(ctk.CTkFrame):
 
         self._active_category = "todas"
         self._search_query = ""
+        self._fact_cards: list[FactCard] = []
+        self._summary_labels: list[ctk.CTkLabel] = []
+        self.bind("<Configure>", self._on_resize, add="+")
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(3, weight=1)
@@ -587,6 +593,9 @@ class MemoryPanel(ctk.CTkFrame):
         )
         self.facts_container.grid(row=3, column=0, sticky="nsew", padx=0, pady=(0, 8))
         self.facts_container.grid_columnconfigure(0, weight=1)
+        self.facts_container._parent_canvas.bind(
+            "<MouseWheel>", lambda e: self.after_idle(self.update_idletasks), add="+"
+        )
 
     # ------------------------------------------------------------------ 5. Seção de Resumos Anteriores
     def _build_summaries_section(self) -> None:
@@ -636,6 +645,8 @@ class MemoryPanel(ctk.CTkFrame):
         self.path_label.configure(text=f"Local: {self.store.db_path.resolve()}")
 
         # Limpa widgets de fatos
+        if hasattr(self, "_fact_cards"):
+            self._fact_cards.clear()
         for child in self.facts_container.winfo_children():
             child.destroy()
 
@@ -666,11 +677,27 @@ class MemoryPanel(ctk.CTkFrame):
                     on_delete=self._on_delete_fact,
                 )
                 card.pack(fill="x", pady=4)
+                if hasattr(self, "_fact_cards"):
+                    self._fact_cards.append(card)
 
         # Atualiza seção de resumos
         self._refresh_summaries()
 
+    def _on_resize(self, event=None) -> None:
+        w = max(240, self.winfo_width() - 32)
+        if hasattr(self, "path_label"):
+            self.path_label.configure(wraplength=w)
+        for card in getattr(self, "_fact_cards", []):
+            card.set_wraplength(max(180, w - 40))
+        for lbl in getattr(self, "_summary_labels", []):
+            try:
+                lbl.configure(wraplength=max(180, w - 100))
+            except Exception:
+                pass
+
     def _refresh_summaries(self) -> None:
+        if hasattr(self, "_summary_labels"):
+            self._summary_labels.clear()
         for child in self.summaries_content.winfo_children():
             child.destroy()
 
@@ -708,9 +735,11 @@ class MemoryPanel(ctk.CTkFrame):
                 font=ctk.CTkFont(theme.FONT_FAMILY, 11),
                 anchor="w",
                 justify="left",
-                wraplength=520,
+                wraplength=max(180, self.winfo_width() - 100),
             )
             text_lbl.grid(row=0, column=1, sticky="w")
+            if hasattr(self, "_summary_labels"):
+                self._summary_labels.append(text_lbl)
 
             del_btn = ctk.CTkButton(
                 row,
