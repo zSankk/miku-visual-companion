@@ -652,7 +652,7 @@ class MemoryPanel(ctk.CTkFrame):
                 self.facts_container,
                 text=msg,
                 text_color=theme.TEXT_MUTED,
-                font=ctk.CTkFont(theme.FONT_FAMILY, 12, "italic"),
+                font=ctk.CTkFont(theme.FONT_FAMILY, 12, slant="italic"),
                 pady=30,
             )
             empty_lbl.pack(fill="x")
@@ -680,7 +680,7 @@ class MemoryPanel(ctk.CTkFrame):
                 self.summaries_content,
                 text="Nenhum resumo registrado ainda (use 'Nova Sessão' para resumir conversas longas).",
                 text_color=theme.TEXT_MUTED,
-                font=ctk.CTkFont(theme.FONT_FAMILY, 11, "italic"),
+                font=ctk.CTkFont(theme.FONT_FAMILY, 11, slant="italic"),
                 anchor="w",
             )
             lbl.pack(fill="x", pady=2)
