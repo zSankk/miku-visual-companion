@@ -58,7 +58,7 @@ if not exist ".env" (
     if exist ".env.example" (
         copy .env.example .env >nul
         echo [OK] Arquivo .env gerado a partir de .env.example.
-        echo [IMPORTANTE] Abra o arquivo .env e adicione sua GEMINI_API_KEY gratuita!
+        echo [DICA] Você pode adicionar sua GEMINI_API_KEY no arquivo .env ou diretamente pela interface da Miku (botão 🔑)!
     ) else (
         echo [AVISO] Arquivo .env.example não foi encontrado.
     )

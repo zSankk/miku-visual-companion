@@ -25,7 +25,7 @@ Assistente Virtual Inteligente de Desktop com **Hatsune Miku**, combinando **IA 
 - [x] **Fase 3: Avatar Live2D Embutido, Emotes e Modo Mascote**
   - Palco PixiJS + Cubism 4 embutido via WebView2, modelos Project Sekai (Normal, Idol, Night, Wonder), articulação simétrica de braços, aceno e Modo Mascote com transparência real.
 - [x] **Fase 4: Memória de Longo Prazo SQLite & Menu de Configurações**
-  - Banco SQLite com diretório configurável e migração automática de pasta, extração de preferências via tags ocultas `[MEMORIA: ...]`, pílula visual de feedback no chat, CRUD visual de fatos, fixação de memórias, backups em JSON e gerenciador de chaves de API.
+  - Banco SQLite com diretório configurável e migração automática de pasta, extração de preferências via tags ocultas `[MEMORIA: ...]`, pílula visual de feedback no chat, CRUD visual de fatos, fixação de memórias, backups em JSON e gerenciador de chaves de API no app.
 - [ ] **Fase 5: Integração Antigravity MCP Bridge**
   - Conexão MCP para execução de tarefas de desenvolvimento e comandos autônomos no ambiente.
 
@@ -50,30 +50,33 @@ git clone https://github.com/zSankk/miku-visual-companion.git
 cd miku-visual-companion
 ```
 
-#### 2. Configurar o Ambiente com 1 Clique (`setup.bat`)
+#### 2. Instalação com 1 Clique (`setup.bat`)
 Dê um duplo clique no arquivo **`setup.bat`** (ou execute no terminal):
 ```bat
 setup.bat
 ```
 O script irá automaticamente:
 - Verificar sua instalação do Python.
-- Criar o ambiente virtual `.venv`.
+- Criar o ambiente virtual isolado (`.venv`).
 - Atualizar o `pip` e instalar todas as dependências (`requirements.txt`).
-- Gerar o arquivo `.env` a partir de `.env.example`.
+- Gerar o arquivo de configuração `.env` inicial.
 
-#### 3. Configurar a Chave de API
-Abra o arquivo `.env` criado na raiz do projeto e insira sua chave gratuita do Google AI Studio (ou configure diretamente pela interface do aplicativo no botão 🔑):
-```env
-GEMINI_API_KEY=sua_chave_aqui
-```
-> *Obtenha sua chave gratuita em: [https://aistudio.google.com/apikey](https://aistudio.google.com/apikey)*
-
-#### 4. Iniciar a Aplicação (`run.bat`)
+#### 3. Iniciar a Aplicação (`run.bat`)
 Dê um duplo clique em **`run.bat`**:
 ```bat
 run.bat
 ```
-A Miku iniciará na sua tela pronta para interagir!
+A Miku iniciará na sua tela imediatamente! Caso seja a primeira vez e você ainda não tenha uma chave configurada, ela iniciará em **Modo Offline (Simulado)** para você testar a interface, o avatar, a voz e os controles sem custo.
+
+#### 4. Configurar a Chave de API Diretamente no Aplicativo (Sem Editar Arquivos!)
+Você pode ativar a IA do Gemini em segundos direto pela interface gráfica:
+1. No menu lateral esquerdo, clique no botão **🔑 Chave de API** (ou no rodapé).
+2. Cole sua chave gratuita do Google AI Studio ([aistudio.google.com/apikey](https://aistudio.google.com/apikey)).
+3. Escolha o modelo desejado (recomendado: `gemini-3.5-flash-lite` ou `gemini-flash-lite-latest`).
+4. Clique em **💾 Salvar e Aplicar** (ou simplesmente pressione **Enter**).
+5. O aplicativo salva a chave automaticamente no `.env` e ativa as respostas inteligentes na hora, sem precisar reiniciar!
+
+> *(Opcional)* Se preferir o método manual tradicional por arquivo de texto, você também pode abrir o arquivo `.env` gerado na raiz e preencher `GEMINI_API_KEY=sua_chave`.
 
 ---
 
