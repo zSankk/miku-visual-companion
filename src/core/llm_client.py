@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import random
+import time
 from typing import Protocol, Sequence
 
 from src.memory.session import Turn
@@ -32,9 +33,10 @@ class Brain(Protocol):
 
 DEFAULT_FALLBACK_MODELS: tuple[str, ...] = (
     "gemini-3.5-flash-lite",
+    "gemini-flash-lite-latest",
     "gemini-3.5-flash",
-    "gemini-3.6-flash",
     "gemini-3.8-flash",
+    "gemini-flash-latest",
 )
 
 
@@ -49,7 +51,7 @@ class GeminiBrain:
         max_output_tokens: int = 600,
         thinking_budget: int | None = 0,
         fallback_models: Sequence[str] = DEFAULT_FALLBACK_MODELS,
-        timeout_ms: int = 12000,
+        timeout_ms: int = 15000,
     ) -> None:
         try:
             from google import genai
@@ -85,9 +87,12 @@ class GeminiBrain:
         if (
             self.thinking_budget is not None
             and "lite" not in model_name
-            and model_name.startswith(("gemini-2.5", "gemini-3.5", "gemini-3.6"))
+            and model_name.startswith(("gemini-2.5", "gemini-3.5", "gemini-3.6", "gemini-3.8"))
         ):
-            kwargs["thinking_config"] = types.ThinkingConfig(thinking_budget=self.thinking_budget)
+            try:
+                kwargs["thinking_config"] = types.ThinkingConfig(thinking_budget=self.thinking_budget)
+            except Exception:
+                pass
         return types.GenerateContentConfig(**kwargs)
 
     def _to_contents(self, history: Sequence[Turn]):
@@ -104,26 +109,52 @@ class GeminiBrain:
         last_exc: Exception | None = None
 
         for candidate in self.fallback_models:
-            try:
-                response = self._client.models.generate_content(
-                    model=candidate,
-                    contents=contents,
-                    config=self._build_config(system_instruction, candidate),
-                )
-                text = (getattr(response, "text", None) or "").strip()
-                if not text:
-                    raise BrainError("O modelo retornou uma resposta vazia (possível bloqueio de segurança).")
-                if candidate != self.model:
-                    log.info("Fallback automático acionado: %s -> %s", self.model, candidate)
-                    self.model = candidate
-                    self.name = f"Gemini ({candidate})"
-                return text
-            except Exception as exc:  # 503, 504, 404, rede...
-                last_exc = exc
-                log.warning("Modelo '%s' indisponível/lento (%s). Tentando próximo...", candidate, exc)
+            # Para o modelo principal ou de alta demanda transitória, tenta retry breve
+            max_attempts = 2 if candidate == self.fallback_models[0] else 1
+            for attempt in range(max_attempts):
+                try:
+                    response = self._client.models.generate_content(
+                        model=candidate,
+                        contents=contents,
+                        config=self._build_config(system_instruction, candidate),
+                    )
+                    text = (getattr(response, "text", None) or "").strip()
+                    if not text:
+                        raise BrainError("O modelo retornou uma resposta vazia (possível bloqueio de segurança).")
+                    if candidate != self.model:
+                        log.info("Fallback automático acionado: %s -> %s", self.model, candidate)
+                        self.model = candidate
+                        self.name = f"Gemini ({candidate})"
+                    return text
+                except Exception as exc:
+                    last_exc = exc
+                    err_str = str(exc)
+                    is_transient = (
+                        "503" in err_str
+                        or "504" in err_str
+                        or "429" in err_str
+                        or "high demand" in err_str.lower()
+                        or "deadline" in err_str.lower()
+                    )
+                    if is_transient and attempt < max_attempts - 1:
+                        log.warning(
+                            "Modelo '%s' com alta demanda transitória (%s). Retentando em 1s...",
+                            candidate,
+                            exc,
+                        )
+                        time.sleep(1.0)
+                        continue
+                    log.warning("Modelo '%s' indisponível/lento (%s). Tentando próximo modelo...", candidate, exc)
+                    break
 
         log.error("Todos os modelos falharam. Último erro: %s", last_exc)
-        raise BrainError(str(last_exc)) from last_exc
+        err_msg = str(last_exc)
+        if "503" in err_msg or "high demand" in err_msg.lower():
+            raise BrainError(
+                "Os servidores do Google estão enfrentando alta demanda temporária no momento (Erro 503). "
+                "Por favor, tente novamente em alguns instantes."
+            ) from last_exc
+        raise BrainError(err_msg) from last_exc
 
 
 class OfflineBrain:
