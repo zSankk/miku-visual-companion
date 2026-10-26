@@ -76,10 +76,13 @@ A Miku iniciará na sua tela imediatamente! Caso seja a primeira vez e você ain
 #### 4. Configurar a Chave de API Diretamente no Aplicativo (Sem Editar Arquivos!)
 Você pode ativar a IA do Gemini em segundos direto pela interface gráfica:
 1. No menu lateral esquerdo, clique no botão **🔑 Chave de API** (ou no rodapé).
-2. Cole sua chave gratuita do Google AI Studio ([aistudio.google.com/apikey](https://aistudio.google.com/apikey)).
-3. Escolha o modelo desejado (recomendado: `gemini-3.5-flash-lite` ou `gemini-flash-lite-latest`).
-4. Clique em **💾 Salvar e Aplicar** (ou simplesmente pressione **Enter**).
-5. O aplicativo salva a chave automaticamente no `.env` e ativa as respostas inteligentes na hora, sem precisar reiniciar!
+2. Acesse o **[Google AI Studio (aistudio.google.com/apikey)](https://aistudio.google.com/apikey)** para obter sua chave:
+   > 💡 **Como gerar a chave 100% gratuita (Free Tier):**
+   > No Google AI Studio, clique no botão azul **"Create API key"** (Criar chave de API) e selecione a opção **"Create API key in new project"** (Criar chave de API em novo projeto). Isso cria a chave instantaneamente no plano gratuito do Google, **sem pedir cartão de crédito nem dados de cobrança**!
+3. Cole a sua chave gerada (`AIzaSy...`) no campo do aplicativo.
+4. Escolha o modelo desejado (recomendado: `gemini-3.5-flash-lite` ou `gemini-flash-lite-latest`).
+5. Clique em **💾 Salvar e Aplicar** (ou simplesmente pressione **Enter**).
+6. O aplicativo salva a chave automaticamente no `.env` e ativa as respostas inteligentes na mesma hora, sem precisar reiniciar!
 
 > *(Opcional)* Se preferir o método manual tradicional por arquivo de texto, você também pode abrir o arquivo `.env` gerado na raiz e preencher `GEMINI_API_KEY=sua_chave`.
 

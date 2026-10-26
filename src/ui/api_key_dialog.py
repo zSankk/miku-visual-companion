@@ -221,6 +221,16 @@ class ApiKeyDialog(ctk.CTkToplevel):
         )
         link_btn.grid(row=2, column=0, columnspan=2, sticky="w", pady=(6, 0))
 
+        ctk.CTkLabel(
+            key_frame,
+            text="💡 Dica: No Google AI Studio, clique em 'Create API key' e selecione 'Create API key in new project' para gerar no plano 100% gratuito (sem cartão).",
+            text_color=theme.TEXT_MUTED,
+            font=ctk.CTkFont(theme.FONT_FAMILY, 10),
+            anchor="w",
+            wraplength=460,
+            justify="left",
+        ).grid(row=3, column=0, columnspan=2, sticky="w", pady=(3, 0))
+
         # Seleção de Modelo
         model_frame = ctk.CTkFrame(content, fg_color="transparent")
         model_frame.grid(row=3, column=0, sticky="ew", padx=6, pady=(0, 12))
