@@ -13,12 +13,14 @@ import customtkinter as ctk
 from src.avatar.live2d_widget import Live2DAvatarController, Live2DAvatarWidget
 from src.avatar.vtube_studio import VTubeStudioController
 from src.core.persona import PersonaError, load_persona
-from src.core.router import ConversationRouter, RouterReply
-from src.core.settings import Settings
+from src.core.router import ConversationRouter, RouterReply, create_brain
+from src.core.settings import Settings, load_settings
 from src.core.state import AgentState, Mode
 from src.ui import theme
 from src.ui.components import (
+    ApiKeyDialog,
     ChatPanel,
+    MemoryPanel,
     MessageBubble,
     ModelsStudioPanel,
     PrivacyPanel,
@@ -36,6 +38,7 @@ _LABEL_TO_MODE = {v: k for k, v in _MODE_LABELS.items()}
 
 _TAB_CHAT = "💬 Conversa"
 _TAB_MODELS = "🎭 Modelos"
+_TAB_MEMORY = "🧠 Memória"
 
 
 class RinApp(ctk.CTk):
@@ -142,7 +145,7 @@ class RinApp(ctk.CTk):
         self.sidebar.grid(row=0, column=0, sticky="nsw")
         self.sidebar.grid_propagate(False)
         self.sidebar.grid_columnconfigure(0, weight=1)
-        self.sidebar.grid_rowconfigure(7, weight=1)
+        self.sidebar.grid_rowconfigure(8, weight=1)
 
         ctk.CTkLabel(
             self.sidebar, text=self.router.persona.name, text_color=theme.ACCENT,
@@ -222,13 +225,29 @@ class RinApp(ctk.CTk):
         )
         self.avatar_toggle_btn.grid(row=6, column=0, sticky="ew", padx=14, pady=(6, 0))
 
+        self.api_key_btn = ctk.CTkButton(
+            self.sidebar,
+            text="🔑 Chave de API (Gemini)",
+            height=34,
+            corner_radius=10,
+            fg_color=theme.BG_CARD,
+            border_width=1,
+            border_color=theme.BORDER,
+            hover_color=theme.BORDER,
+            text_color=theme.TEXT_PRIMARY,
+            font=ctk.CTkFont(theme.FONT_FAMILY, 11, "bold"),
+            command=self._open_api_key_dialog,
+        )
+        self.api_key_btn.grid(row=7, column=0, sticky="ew", padx=14, pady=(6, 0))
+
         brain_name = getattr(self.router.brain, "name", "?")
         self.footer = ctk.CTkLabel(
             self.sidebar, text=f"Cérebro: {brain_name}\nAtalhos: Ctrl+N nova sessão · Ctrl+D modo",
             text_color=theme.TEXT_MUTED, justify="left", anchor="w", wraplength=250,
-            font=ctk.CTkFont(theme.FONT_FAMILY, 11),
+            font=ctk.CTkFont(theme.FONT_FAMILY, 11), cursor="hand2",
         )
-        self.footer.grid(row=8, column=0, sticky="sw", padx=20, pady=12)
+        self.footer.grid(row=9, column=0, sticky="sw", padx=20, pady=12)
+        self.footer.bind("<Button-1>", lambda e: self._open_api_key_dialog())
 
         # -------------------------------------------------------------- main
         self.main_area = ctk.CTkFrame(self, fg_color="transparent")
@@ -247,7 +266,7 @@ class RinApp(ctk.CTk):
 
         self.nav_tabs = ctk.CTkSegmentedButton(
             self.nav_bar,
-            values=[_TAB_CHAT, _TAB_MODELS],
+            values=[_TAB_CHAT, _TAB_MODELS, _TAB_MEMORY],
             command=self._on_tab_selected,
             selected_color=theme.ACCENT,
             selected_hover_color=theme.ACCENT_HOVER,
@@ -274,6 +293,14 @@ class RinApp(ctk.CTk):
             )
         else:
             self.models_studio = None
+
+        # Aba 3: "🧠 Memória" (Memória de Longo Prazo SQLite)
+        self.memory_panel = MemoryPanel(
+            self.main_area,
+            memory_store=self.router.long_term,
+            on_archive_session=self._archive_and_new_session,
+            on_status_message=lambda msg: self.chat.add_system(msg),
+        )
 
         # Painel Direito: Renderizador Live2D Embutido + Soundboard de Emotes
         if isinstance(self.avatar, Live2DAvatarController):
@@ -482,11 +509,21 @@ class RinApp(ctk.CTk):
     def _on_tab_selected(self, tab_label: str) -> None:
         if tab_label == _TAB_MODELS and self.models_studio is not None:
             self.chat.grid_remove()
+            if hasattr(self, "memory_panel"):
+                self.memory_panel.grid_remove()
             self.models_studio.refresh_models_gallery()
             self.models_studio.grid(row=2, column=0, sticky="nsew")
+        elif tab_label == _TAB_MEMORY and hasattr(self, "memory_panel"):
+            self.chat.grid_remove()
+            if self.models_studio is not None:
+                self.models_studio.grid_remove()
+            self.memory_panel.refresh()
+            self.memory_panel.grid(row=2, column=0, sticky="nsew")
         else:
             if self.models_studio is not None:
                 self.models_studio.grid_remove()
+            if hasattr(self, "memory_panel"):
+                self.memory_panel.grid_remove()
             self.chat.grid(row=2, column=0, sticky="nsew")
 
     def _toggle_mascot_mode(self) -> None:
@@ -555,6 +592,30 @@ class RinApp(ctk.CTk):
         except Exception as exc:
             log.debug("Ajuste Win32 borderless ignorado: %s", exc)
 
+    def _get_screen_work_area(self) -> tuple[int, int, int, int]:
+        """Retorna (left, top, width, height) da área útil da tela excluindo a barra de tarefas.
+        Funciona com precisão em qualquer resolução (1080p, 1440p, 4K, 720p/laptops) e escalas de DPI."""
+        try:
+            class RECT(ctypes.Structure):
+                _fields_ = [
+                    ("left", ctypes.c_long),
+                    ("top", ctypes.c_long),
+                    ("right", ctypes.c_long),
+                    ("bottom", ctypes.c_long),
+                ]
+
+            rect = RECT()
+            if ctypes.windll.user32.SystemParametersInfoW(0x0030, 0, ctypes.byref(rect), 0):
+                w = max(400, int(rect.right - rect.left))
+                h = max(300, int(rect.bottom - rect.top))
+                return int(rect.left), int(rect.top), w, h
+        except Exception as exc:
+            log.debug("Fallback de área útil: %s", exc)
+
+        sw = self.winfo_screenwidth()
+        sh = self.winfo_screenheight()
+        return 0, 0, sw, max(300, sh - 60)
+
     def _enter_mascot_mode(self) -> None:
         if self._mascot_mode:
             return
@@ -597,12 +658,13 @@ class RinApp(ctk.CTk):
         # Exibe a pílula compacta de controles (Mover, -/+, Mic, Voz, Chat, Janela) sob os pés da Miku
         self.mascot_drag_bar.grid(row=2, column=0, sticky="ew", padx=6, pady=(2, 4))
 
-        mascot_w = max(250, int(340 * self._mascot_scale))
-        mascot_h = max(350, int(510 * self._mascot_scale))
-        screen_w = self.winfo_screenwidth()
-        screen_h = self.winfo_screenheight()
-        pos_x = max(10, screen_w - mascot_w - 16)
-        pos_y = max(10, screen_h - mascot_h - 48)
+        mascot_w = max(240, int(340 * self._mascot_scale))
+        mascot_h = max(340, int(510 * self._mascot_scale))
+        left, top, work_w, work_h = self._get_screen_work_area()
+
+        # Posiciona no canto inferior direito acima da barra de tarefas para qualquer resolução (1080p, 1440p, 4K, laptops)
+        pos_x = left + max(10, work_w - mascot_w - 24)
+        pos_y = top + max(10, work_h - mascot_h - 12)
 
         self.minsize(240, 320)
         self.attributes("-topmost", True)
@@ -664,7 +726,24 @@ class RinApp(ctk.CTk):
         self.configure(fg_color=theme.BG_APP)
         self.main_area.configure(fg_color="transparent")
         self.minsize(920, 580)
-        self.geometry(self._saved_geometry)
+
+        # Centraliza a janela no meio da tela ao voltar do modo mascote (respeitando resolução da tela)
+        left, top, work_w, work_h = self._get_screen_work_area()
+
+        win_w = min(1280, max(920, int(work_w * 0.90)))
+        win_h = min(780, max(560, int(work_h * 0.90)))
+        try:
+            dim_part = self._saved_geometry.split("+")[0]
+            w_str, h_str = dim_part.split("x")
+            saved_w, saved_h = int(w_str), int(h_str)
+            if 800 <= saved_w <= work_w and 500 <= saved_h <= work_h:
+                win_w, win_h = saved_w, saved_h
+        except Exception:
+            pass
+
+        center_x = left + max(0, (work_w - win_w) // 2)
+        center_y = top + max(0, (work_h - win_h) // 2)
+        self.geometry(f"{win_w}x{win_h}+{center_x}+{center_y}")
 
         self.mascot_drag_bar.grid_remove()
         self.mascot_balloon.grid_remove()
@@ -754,6 +833,25 @@ class RinApp(ctk.CTk):
         self.mic.set_device(device_index)
         self.voice_settings.device_index = device_index
         self.voice_settings.save()
+
+    def _open_api_key_dialog(self) -> None:
+        ApiKeyDialog(
+            self,
+            settings=self.settings,
+            on_saved=self._on_api_credentials_saved,
+        )
+
+    def _on_api_credentials_saved(self, key: str, model: str) -> None:
+        self.settings = load_settings()
+        self.router.brain = create_brain(self.settings, self.router.persona)
+        brain_name = getattr(self.router.brain, "name", "?")
+        self.footer.configure(
+            text=f"Cérebro: {brain_name}\nAtalhos: Ctrl+N nova sessão · Ctrl+D modo"
+        )
+        if self.settings.has_api_key:
+            self.chat.add_system(f"✔ Chave GEMINI_API_KEY ativada com sucesso! Cérebro ativo: {brain_name}")
+        else:
+            self.chat.add_system("Chave desativada: operando no modo offline (simulado).")
 
     def _open_voice_settings(self) -> None:
         VoiceSettingsDialog(
@@ -884,7 +982,15 @@ class RinApp(ctk.CTk):
         if not self.settings.has_api_key:
             self.chat.add_system("Sem GEMINI_API_KEY no .env: respostas simuladas (modo offline).")
 
-    def _new_session(self) -> None:
+    def _archive_and_new_session(self) -> str | None:
+        """Gera resumo conciso com IA, salva em summaries e limpa a sessão."""
+        summary = self.router.archive_and_new_session()
+        self._new_session(skip_router=True)
+        if summary:
+            self.chat.add_system(f"Resumo da conversa anterior arquivado na memória: {summary}")
+        return summary
+
+    def _new_session(self, skip_router: bool = False) -> None:
         self._session_id += 1  # respostas pendentes da sessão anterior serão descartadas
         self._cancel_typing()
         self.tts.stop()
@@ -898,7 +1004,10 @@ class RinApp(ctk.CTk):
         except PersonaError as exc:
             log.error("Falha ao recarregar persona: %s", exc)
 
-        self.router.new_session(persona)
+        if not skip_router:
+            self.router.new_session(persona)
+        elif persona is not None:
+            self.router.persona = persona
         self.chat.clear()
         self._update_idle_or_listening_state()
         self.status.set_emotion(self.router.persona.default_emotion)
@@ -969,7 +1078,13 @@ class RinApp(ctk.CTk):
             self.avatar.trigger_action(reply.action)
         self._set_agent_state(AgentState.FALANDO)
         self.mascot_bubble_lbl.configure(text=f"💬 {self.router.persona.name}: {reply.text}")
-        bubble = self.chat.add_message("rin", "", reply.emotion)
+        mem_info = None
+        if reply.saved_memories:
+            mem_info = " · ".join(f.content for f in reply.saved_memories)
+            if hasattr(self, "memory_panel"):
+                self.memory_panel.refresh()
+
+        bubble = self.chat.add_message("rin", "", reply.emotion, memory_saved=mem_info)
         bubble.full_text = reply.text
         self._typing_done = False
         self._tts_done = not self.tts.enabled

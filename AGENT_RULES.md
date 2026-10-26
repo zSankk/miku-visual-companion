@@ -8,7 +8,7 @@ Este documento define as diretrizes obrigatórias de desenvolvimento, controle d
 Todo commit deve seguir o padrão Conventional Commits com mensagens claras em português:
 - `feat:` Nova funcionalidade ou recurso para o usuário.
 - `fix:` Correção de bug ou falha no sistema.
-- `docs:` Alterações em documentação (`README.md`, `AGENT_RULES.md`, comentários).
+- `docs:` Alterações em documentação (`README.md`, `AGENT_RULES.md`, `CHANGELOG.md`, comentários).
 - `refactor:` Refatoração de código sem alterar comportamento externo.
 - `test:` Adição ou modificação de testes unitários (`pytest`).
 - `chore:` Tarefas de manutenção, dependências ou scripts auxiliares.
@@ -50,3 +50,14 @@ Para novas fases ou grandes funcionalidades:
 - **NUNCA** commitar pastas de ambientes virtuais (`.venv/`, `venv/`) ou caches (`__pycache__/`).
 - Manter o [`.env.example`](.env.example) sempre atualizado com as variáveis necessárias sem valores sensíveis.
 - Manter o [`.gitignore`](.gitignore) rigorosamente atualizado.
+
+---
+
+## 4. Registro de Mudanças Obrigatório (Update Log / CHANGELOG.md)
+- **Sempre** que uma nova versão (tag como `v0.2.0`, `v0.3.0`, etc.) for lançada ou enviada ao GitHub, é obrigatório atualizar o arquivo [`CHANGELOG.md`](CHANGELOG.md) na raiz do projeto.
+- O registro de cada versão deve ser detalhado e categorizado:
+  - 🚀 **Novas Funcionalidades**: O que foi adicionado.
+  - 🎨 **Melhorias Visuais e UI/UX**: Ajustes de interface, layout responsivo e fluidez.
+  - 🛠️ **Correções de Bugs**: Problemas resolvidos com causas e efeitos.
+  - 🔒 **Segurança e Estabilidade**: Resiliência da API, privacidade e arquitetura.
+- As tags do Git (`git tag -a vX.Y.Z`) devem ser criadas após o merge na `main` e sincronizadas (`git push origin --tags`).

@@ -439,11 +439,11 @@ class Live2DAvatarController:
     ) -> None:
         """Atualiza Zoom (Escala), Posição X/Y e Sensibilidade do LipSync em tempo real."""
         if zoom is not None:
-            self.settings.zoom = round(max(0.45, min(2.2, float(zoom))), 2)
+            self.settings.zoom = round(max(0.40, min(2.8, float(zoom))), 2)
         if offset_x is not None:
-            self.settings.offset_x = round(max(-220.0, min(220.0, float(offset_x))), 1)
+            self.settings.offset_x = round(max(-450.0, min(450.0, float(offset_x))), 1)
         if offset_y is not None:
-            self.settings.offset_y = round(max(-220.0, min(220.0, float(offset_y))), 1)
+            self.settings.offset_y = round(max(-500.0, min(500.0, float(offset_y))), 1)
         if lip_sync_sensitivity is not None:
             self.settings.lip_sync_sensitivity = round(max(0.2, min(2.5, float(lip_sync_sensitivity))), 2)
 
@@ -811,6 +811,17 @@ class Live2DAvatarWidget(ctk.CTkFrame):
                         delta = int(data.get("delta", 0))
                         if delta != 0:
                             _run_ui_safe(lambda d=delta: self._on_mascot_scale(d))
+                    elif msg_type == "transform_changed":
+                        try:
+                            ox = float(data.get("offsetX", self.controller.settings.offset_x))
+                            oy = float(data.get("offsetY", self.controller.settings.offset_y))
+                            zm = float(data.get("zoom", self.controller.settings.zoom))
+                            self.controller.settings.offset_x = ox
+                            self.controller.settings.offset_y = oy
+                            self.controller.settings.zoom = zm
+                            self.controller.settings.save()
+                        except Exception:
+                            pass
                 except Exception:
                     pass
 

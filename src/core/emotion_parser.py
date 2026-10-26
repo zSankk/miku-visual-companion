@@ -6,6 +6,7 @@ Robustez esperada (o modelo nem sempre obedece perfeitamente):
 - maiúsculas e acentos (`[Pensativa]`, `[SURPRESA]`);
 - sinônimos comuns (`[sarcástica]` -> `sarcasmo`, `[brava]` -> `irritada`);
 - tags de ação (`[acao: acenar]`, `[acao: feliz]`, `[acao: rir]`, `[acao: pensar]`, `[acao: bravo]`, `[acao: cantar]`);
+- tags de memória (`[MEMORIA: categoria | fato conciso | confirmado]`);
 - detecção automática de cumprimentos do usuário ('oi', 'olá', 'e aí', 'bom dia', etc.) -> `acenar`;
 - resposta sem tag ou com tag inválida -> emoção padrão (`neutra`).
 """
@@ -108,6 +109,11 @@ _ACTION_TAG_RE = re.compile(
     r"[*_`]*\[\s*(?:acao|ação|emote|action)\s*:\s*([^\[\]\n]{1,30}?)\s*\][*_`]*[ \t]*",
     re.IGNORECASE,
 )
+# Tag de memória persistente no final ou corpo: [MEMORIA: categoria | fato conciso | confirmado]
+_MEMORY_TAG_RE = re.compile(
+    r"[*_`]*\[\s*mem[oó]ria\s*:\s*([^\[\]\n]{1,500}?)\s*\][*_`]*[ \t]*",
+    re.IGNORECASE,
+)
 # Qualquer tag de emoção válida "perdida" no meio do texto (removida do visível).
 _ANY_TAG_RE = re.compile(r"\[\s*([A-Za-zÀ-ÿ!]{3,20})\s*\]\s?")
 
@@ -120,12 +126,20 @@ _SING_RE = re.compile(r"\b(?:canta|cantar|m[uú]sica|vocaloid|dan[cç]a|dan[cç]
 
 
 @dataclass(frozen=True)
+class MemoryTag:
+    category: str
+    content: str
+    confidence: str = "confirmado"
+
+
+@dataclass(frozen=True)
 class ParsedReply:
     emotion: str
     text: str
     raw: str
     had_valid_tag: bool
     action: str | None = None
+    memories: tuple[MemoryTag, ...] = ()
 
 
 def _strip_accents(value: str) -> str:
@@ -196,6 +210,24 @@ def parse_reply(raw: str | None, default_emotion: str = DEFAULT_EMOTION) -> Pars
     action: str | None = None
     text = raw
 
+    # 0. Extrai tags [MEMORIA: categoria | fato | confirmado]
+    memories_list: list[MemoryTag] = []
+    for m in _MEMORY_TAG_RE.finditer(text):
+        raw_val = m.group(1).strip()
+        parts = [p.strip() for p in raw_val.split("|") if p.strip()]
+        if len(parts) >= 2:
+            cat = parts[0]
+            cnt = parts[1]
+            conf = parts[2] if len(parts) > 2 else "confirmado"
+        elif len(parts) == 1:
+            cat = "outros"
+            cnt = parts[0]
+            conf = "confirmado"
+        else:
+            continue
+        memories_list.append(MemoryTag(category=cat, content=cnt, confidence=conf))
+    text = _MEMORY_TAG_RE.sub("", text)
+
     # 1. Extrai todas as tags [acao: ...] presentes na resposta
     for m in _ACTION_TAG_RE.finditer(text):
         norm_act = normalize_action(m.group(1))
@@ -257,4 +289,5 @@ def parse_reply(raw: str | None, default_emotion: str = DEFAULT_EMOTION) -> Pars
         raw=raw,
         had_valid_tag=emotion is not None,
         action=action,
+        memories=tuple(memories_list),
     )

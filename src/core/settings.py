@@ -55,12 +55,55 @@ class Settings:
         return bool(self.api_key)
 
 
+def save_api_credentials(
+    api_key: str,
+    model: str | None = None,
+    env_file: Path | None = None,
+) -> None:
+    """Atualiza de forma segura e atômica o GEMINI_API_KEY e GEMINI_MODEL no arquivo .env."""
+    path = env_file or (PROJECT_ROOT / ".env")
+    lines: list[str] = []
+    if path.is_file():
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except Exception:
+            lines = []
+
+    clean_key = api_key.strip()
+    clean_model = (model or DEFAULT_MODEL).strip()
+
+    key_written = False
+    model_written = False
+    new_lines: list[str] = []
+
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("GEMINI_API_KEY=") or stripped.startswith("GOOGLE_API_KEY="):
+            new_lines.append(f"GEMINI_API_KEY={clean_key}")
+            key_written = True
+        elif stripped.startswith("GEMINI_MODEL=") or stripped.startswith("RIN_MODEL="):
+            new_lines.append(f"GEMINI_MODEL={clean_model}")
+            model_written = True
+        else:
+            new_lines.append(line)
+
+    if not key_written:
+        new_lines.append(f"GEMINI_API_KEY={clean_key}")
+    if not model_written:
+        new_lines.append(f"GEMINI_MODEL={clean_model}")
+
+    path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+    os.environ["GEMINI_API_KEY"] = clean_key
+    os.environ["GEMINI_MODEL"] = clean_model
+    os.environ["RIN_MODEL"] = clean_model
+
+
 def load_settings(env_file: Path | None = None) -> Settings:
     """Carrega o `.env` (se existir) e monta o objeto `Settings`."""
     try:
         from dotenv import load_dotenv
 
-        load_dotenv(env_file or PROJECT_ROOT / ".env", override=False)
+        load_dotenv(env_file or PROJECT_ROOT / ".env", override=True)
     except ImportError:  # python-dotenv é opcional em tempo de teste
         pass
 
@@ -70,9 +113,11 @@ def load_settings(env_file: Path | None = None) -> Settings:
     if not persona_path.is_absolute():
         persona_path = PROJECT_ROOT / persona_path
 
+    model_name = (os.getenv("GEMINI_MODEL") or os.getenv("RIN_MODEL") or DEFAULT_MODEL).strip()
+
     return Settings(
         api_key=api_key or None,
-        model=(os.getenv("RIN_MODEL") or DEFAULT_MODEL).strip(),
+        model=model_name,
         temperature=_env_float("RIN_TEMPERATURE"),
         thinking_budget=_env_int("RIN_THINKING_BUDGET", 0),
         default_mode=Mode.from_str(os.getenv("RIN_DEFAULT_MODE")),

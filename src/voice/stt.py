@@ -392,9 +392,19 @@ class SpeechToText:
         import sounddevice as sd
 
         device_in = self.mic.device_index
+        device_out = None
+        if device_in is not None:
+            try:
+                in_info = sd.query_devices(device_in)
+                in_hostapi = in_info.get("hostapi")
+                for idx, d in enumerate(sd.query_devices()):
+                    if d.get("max_output_channels", 0) > 0 and d.get("hostapi") == in_hostapi:
+                        device_out = idx
+                        break
+            except Exception:
+                pass
 
-        def _cb(indata, outdata, _frames, _time, _status) -> None:
-            outdata[:] = indata
+        def _calc_level(indata) -> None:
             if on_level:
                 samples = indata.astype(np.float32) / 32768.0
                 rms = float(np.sqrt(np.mean(samples * samples))) if samples.size else 0.0
@@ -404,14 +414,33 @@ class SpeechToText:
                 except Exception:
                     pass
 
-        stream = sd.Stream(
-            samplerate=SAMPLE_RATE,
-            blocksize=BLOCK_SIZE,
-            device=(device_in, None),
-            channels=1,
-            dtype="int16",
-            callback=_cb,
-        )
+        stream = None
+        try:
+            def _cb_duplex(indata, outdata, _frames, _time, _status) -> None:
+                outdata[:] = indata
+                _calc_level(indata)
+
+            stream = sd.Stream(
+                samplerate=SAMPLE_RATE,
+                blocksize=BLOCK_SIZE,
+                device=(device_in, device_out),
+                channels=1,
+                dtype="int16",
+                callback=_cb_duplex,
+            )
+        except Exception as exc:
+            log.warning("Loopback duplex indisponível (%s, %s): %s. Usando InputStream.", device_in, device_out, exc)
+            def _cb_input(indata, _frames, _time, _status) -> None:
+                _calc_level(indata)
+
+            stream = sd.InputStream(
+                samplerate=SAMPLE_RATE,
+                blocksize=BLOCK_SIZE,
+                device=device_in,
+                channels=1,
+                dtype="int16",
+                callback=_cb_input,
+            )
         with self._loopback_lock:
             self._loopback_stream = stream
         stream.start()
