@@ -41,7 +41,7 @@ Para conferir o histórico detalhado de cada versão e suas mudanças, veja o [*
 ## 🚀 Como Rodar em um Novo PC (Windows)
 
 ### Pré-requisitos
-1. **Python 3.10 ou superior** instalado ([python.org](https://www.python.org/downloads/)) — marque a opção *"Add Python to PATH"*.
+1. **Python 3.10 ou superior** instalado ([python.org](https://www.python.org/downloads/)) — marque a opção *"Add Python to PATH"*. *(Caso não tenha, o script de instalação automática baixará para você).*
 2. **Git** instalado ([git-scm.com](https://git-scm.com/)).
 3. **Microsoft Edge WebView2 Runtime** (já incluído no Windows 10/11 por padrão).
 
@@ -61,13 +61,21 @@ Dê um duplo clique no arquivo **`setup.bat`** (ou execute no terminal):
 setup.bat
 ```
 O script irá automaticamente:
-- Verificar sua instalação do Python.
+- Verificar sua instalação do Python (com download e instalação silenciosa automática caso não esteja presente, ideal para Windows LTSC).
 - Criar o ambiente virtual isolado (`.venv`).
 - Atualizar o `pip` e instalar todas as dependências (`requirements.txt`).
+- Baixar os pesos da voz da Miku (RVC local, ~930 MB, só na primeira vez) em `data/models/miku_rvc/`.
 - Gerar o arquivo de configuração `.env` inicial.
+- Criar o atalho **Miku Visual Companion** na sua Área de Trabalho.
 
-#### 3. Iniciar a Aplicação (`run.bat`)
-Dê um duplo clique em **`run.bat`**:
+> 🎤 **Voz da Miku:** sem esses pesos o app funciona, mas fala com a voz reserva do Edge-TTS (`pt-BR-FranciscaNeural`). Se o download falhar ou for interrompido, rode o `setup.bat` de novo, ou apenas:
+> ```bat
+> .venv\Scripts\python.exe scripts\download_miku_models.py
+> ```
+> O script baixa **somente pesos** (nenhum código), em versões fixas, e confere o SHA-256 de cada arquivo antes de instalar. Em PCs sem GPU NVIDIA a voz é gerada pela CPU e cada frase pode levar alguns segundos.
+
+#### 3. Iniciar a Aplicação (`run.bat` ou Atalho da Área de Trabalho)
+Dê um duplo clique no atalho criado na sua Área de Trabalho ou no arquivo **`run.bat`**:
 ```bat
 run.bat
 ```

@@ -1,0 +1,2 @@
+# Scripts .bat precisam de CRLF: com LF o cmd.exe falha em labels/goto.
+*.bat text eol=crlf
