@@ -19,6 +19,7 @@ from src.core.state import AgentState, Mode
 from src.ui import theme
 from src.ui.components import (
     ChatPanel,
+    MemoryPanel,
     MessageBubble,
     ModelsStudioPanel,
     PrivacyPanel,
@@ -36,6 +37,7 @@ _LABEL_TO_MODE = {v: k for k, v in _MODE_LABELS.items()}
 
 _TAB_CHAT = "💬 Conversa"
 _TAB_MODELS = "🎭 Modelos"
+_TAB_MEMORY = "🧠 Memória"
 
 
 class RinApp(ctk.CTk):
@@ -247,7 +249,7 @@ class RinApp(ctk.CTk):
 
         self.nav_tabs = ctk.CTkSegmentedButton(
             self.nav_bar,
-            values=[_TAB_CHAT, _TAB_MODELS],
+            values=[_TAB_CHAT, _TAB_MODELS, _TAB_MEMORY],
             command=self._on_tab_selected,
             selected_color=theme.ACCENT,
             selected_hover_color=theme.ACCENT_HOVER,
@@ -274,6 +276,14 @@ class RinApp(ctk.CTk):
             )
         else:
             self.models_studio = None
+
+        # Aba 3: "🧠 Memória" (Memória de Longo Prazo SQLite)
+        self.memory_panel = MemoryPanel(
+            self.main_area,
+            memory_store=self.router.long_term,
+            on_archive_session=self._archive_and_new_session,
+            on_status_message=lambda msg: self.chat.add_system(msg),
+        )
 
         # Painel Direito: Renderizador Live2D Embutido + Soundboard de Emotes
         if isinstance(self.avatar, Live2DAvatarController):
@@ -482,11 +492,21 @@ class RinApp(ctk.CTk):
     def _on_tab_selected(self, tab_label: str) -> None:
         if tab_label == _TAB_MODELS and self.models_studio is not None:
             self.chat.grid_remove()
+            if hasattr(self, "memory_panel"):
+                self.memory_panel.grid_remove()
             self.models_studio.refresh_models_gallery()
             self.models_studio.grid(row=2, column=0, sticky="nsew")
+        elif tab_label == _TAB_MEMORY and hasattr(self, "memory_panel"):
+            self.chat.grid_remove()
+            if self.models_studio is not None:
+                self.models_studio.grid_remove()
+            self.memory_panel.refresh()
+            self.memory_panel.grid(row=2, column=0, sticky="nsew")
         else:
             if self.models_studio is not None:
                 self.models_studio.grid_remove()
+            if hasattr(self, "memory_panel"):
+                self.memory_panel.grid_remove()
             self.chat.grid(row=2, column=0, sticky="nsew")
 
     def _toggle_mascot_mode(self) -> None:
@@ -884,7 +904,15 @@ class RinApp(ctk.CTk):
         if not self.settings.has_api_key:
             self.chat.add_system("Sem GEMINI_API_KEY no .env: respostas simuladas (modo offline).")
 
-    def _new_session(self) -> None:
+    def _archive_and_new_session(self) -> str | None:
+        """Gera resumo conciso com IA, salva em summaries e limpa a sessão."""
+        summary = self.router.archive_and_new_session()
+        self._new_session(skip_router=True)
+        if summary:
+            self.chat.add_system(f"Resumo da conversa anterior arquivado na memória: {summary}")
+        return summary
+
+    def _new_session(self, skip_router: bool = False) -> None:
         self._session_id += 1  # respostas pendentes da sessão anterior serão descartadas
         self._cancel_typing()
         self.tts.stop()
@@ -898,7 +926,10 @@ class RinApp(ctk.CTk):
         except PersonaError as exc:
             log.error("Falha ao recarregar persona: %s", exc)
 
-        self.router.new_session(persona)
+        if not skip_router:
+            self.router.new_session(persona)
+        elif persona is not None:
+            self.router.persona = persona
         self.chat.clear()
         self._update_idle_or_listening_state()
         self.status.set_emotion(self.router.persona.default_emotion)

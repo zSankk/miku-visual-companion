@@ -1683,3 +1683,7 @@ class ModelsStudioPanel(ctk.CTkScrollableFrame):
         if self._on_test_sing_speak:
             self._on_test_sing_speak()
 
+
+
+# Re-export do painel de memória e armazenamento
+from src.ui.memory_panel import EditFactDialog, FactCard, MemoryPanel
