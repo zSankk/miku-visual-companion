@@ -1,0 +1,34 @@
+# Rin Virtual Companion - Fase 1 & 2
+# Interface desktop moderna (dark mode)
+customtkinter>=5.2.2
+
+# Cérebro de conversa (SDK oficial Google Gen AI)
+google-genai>=1.0.0
+
+# Configuração
+pyyaml>=6.0.1
+python-dotenv>=1.0.1
+
+# Captura de Microfone e Reconhecimento de Voz 100% Local (Faster-Whisper)
+sounddevice>=0.5.0
+numpy>=1.26.0
+faster-whisper>=1.1.0
+
+# Síntese de Voz Miku RVC 100% Local (John6666/mikuTTS / NoCrypt/miku_RVC) + Fallback Edge-TTS
+torch>=2.4.0
+torchaudio>=2.4.0
+scipy>=1.13.0
+faiss-cpu>=1.8.0
+praat-parselmouth>=0.4.3
+gradio_client>=1.0.0
+huggingface_hub>=0.25.0
+edge-tts>=7.0.0
+av>=12.0.0
+soundfile>=0.12.1
+
+# Avatar Anime Live2D Embutido (PixiJS + pixi-live2d-display Cubism 4 via Edge WebView2)
+pywebview>=5.0.0
+pythonnet>=3.0.0
+
+# Testes
+pytest>=8.0.0

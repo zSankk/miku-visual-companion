@@ -1,0 +1,1446 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rin Live2D Avatar (Project Sekai / Cubism)</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: radial-gradient(circle at 50% 30%, #1a2138 0%, #0b0d14 80%);
+      font-family: "Segoe UI", system-ui, sans-serif;
+      color: #eef0f6;
+    }
+    /* No Modo Mascote PNG, o fundo do WebView2 é 100% transparente (Alpha = 0) sem fundo preto */
+    html.mascot-mode,
+    body.mascot-mode {
+      background: transparent !important;
+      background-color: rgba(0, 0, 0, 0) !important;
+      background-image: none !important;
+    }
+    #stage-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: transparent;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      background: transparent;
+      cursor: grab;
+    }
+    canvas:active {
+      cursor: grabbing;
+    }
+    #hud-badge {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(18, 21, 31, 0.80);
+      border: 1px solid rgba(255, 255, 255, 0.09);
+      font-size: 11px;
+      font-weight: 600;
+      color: #c0caf5;
+      pointer-events: none;
+      backdrop-filter: blur(6px);
+      z-index: 10;
+    }
+    body.mascot-mode #hud-badge {
+      display: none !important;
+    }
+    #hud-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #4ade80;
+      box-shadow: 0 0 8px #4ade80;
+    }
+    /* Barra flutuante minimalista que só aparece ao passar o mouse sobre a Miku no Modo Mascote PNG */
+    #mascot-hover-bar {
+      position: absolute;
+      top: 6px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: none;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: rgba(20, 24, 38, 0.92);
+      border: 1px solid #e05297;
+      z-index: 25;
+      opacity: 0;
+      transition: opacity 0.18s ease;
+    }
+    body.mascot-mode #mascot-hover-bar {
+      display: none !important;
+    }
+    body.mascot-mode:hover #mascot-hover-bar {
+      opacity: 1;
+    }
+    .mascot-pill-btn {
+      background: #23283d;
+      color: #eef0f6;
+      border: 1px solid #363d59;
+      border-radius: 999px;
+      padding: 3px 9px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .mascot-pill-btn:hover {
+      background: #e05297;
+      color: #ffffff;
+      border-color: #e05297;
+    }
+    #action-toast {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #e05297;
+      color: #ffffff;
+      font-size: 11px;
+      font-weight: 700;
+      pointer-events: none;
+      opacity: 0;
+      transform: translateY(-6px);
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      z-index: 12;
+    }
+    body.mascot-mode #action-toast {
+      top: 38px;
+      right: auto;
+      left: 50%;
+      transform: translateX(-50%) translateY(-6px);
+    }
+    #action-toast.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    body.mascot-mode #action-toast.visible {
+      transform: translateX(-50%) translateY(0);
+    }
+    #loading-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      background: rgba(11, 13, 20, 0.76);
+      color: #a9b1d6;
+      font-size: 12px;
+      z-index: 20;
+      transition: opacity 0.25s ease;
+    }
+    body.mascot-mode #loading-overlay {
+      background: transparent;
+    }
+    #loading-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .spinner {
+      width: 28px;
+      height: 28px;
+      border: 3px solid rgba(224, 108, 159, 0.22);
+      border-top-color: #e05297;
+      border-radius: 50%;
+      animation: spin 0.85s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+  <!-- Runtime completo Live2D (Cubism 2 + Cubism 4 / Project Sekai) + PixiJS -->
+  <script src="./lib/live2d.min.js"></script>
+  <script src="./lib/live2dcubismcore.min.js"></script>
+  <script src="./lib/pixi.min.js"></script>
+  <script src="./lib/pixi-live2d-index.min.js"></script>
+</head>
+<body>
+  <div id="stage-container">
+    <div id="hud-badge">
+      <span id="hud-dot"></span>
+      <span id="hud-label">Miku Live2D · Inativa</span>
+    </div>
+    <div id="mascot-hover-bar">
+      <button class="mascot-pill-btn" id="btn-mascot-chat" title="Mostrar/Ocultar Balão de Chat">💬 Chat</button>
+      <button class="mascot-pill-btn" id="btn-mascot-wave" title="Acenar">👋</button>
+      <button class="mascot-pill-btn" id="btn-mascot-expand" title="Voltar à Janela Completa (Esc)">🗖 Janela</button>
+    </div>
+    <div id="action-toast">👋 Acenando</div>
+    <div id="loading-overlay">
+      <div class="spinner"></div>
+      <div id="loading-text">Carregando Hatsune Miku Live2D...</div>
+    </div>
+    <canvas id="avatar-canvas"></canvas>
+  </div>
+
+  <script>
+    (function () {
+      "use strict";
+
+      const MIKU_SEKAI_DEFAULT_MODEL = "https://rin.local/assets/models/miku_sekai_normal/21miku_normal_3.0_f_t06.model3.json";
+      const MIKU_CLASSIC_MODEL = "https://rin.local/assets/models/miku_sekai/miku.model.json";
+      const HARU_FALLBACK_MODEL = "https://rin.local/assets/models/haru/haru_greeter_t03.model3.json";
+
+      // Presets de emoções universais (compatíveis com modelos Sekai/Cubism 4 e Cubism 2)
+      const EMOTION_PRESETS = {
+        neutra: {
+          label: "Neutra",
+          expNames: ["f00", "F01", "neutral", "normal"],
+          eyeSmile: 0.0,
+          eyeOpen: 1.0,
+          mouthForm: 0.2,
+          browLY: 0.0,
+          browRY: 0.0,
+          browAngle: 0.0,
+          angleZ: 0.0,
+          cheek: 0.0
+        },
+        feliz: {
+          label: "Feliz",
+          expNames: ["f01", "f02", "F02", "F03", "happy", "smile"],
+          eyeSmile: 0.95,
+          eyeOpen: 0.92,
+          mouthForm: 1.0,
+          browLY: 0.38,
+          browRY: 0.38,
+          browAngle: 0.25,
+          angleZ: 4.5,
+          cheek: 0.65
+        },
+        irritada: {
+          label: "Irritada",
+          expNames: ["f03", "f04", "F04", "F05", "angry"],
+          eyeSmile: 0.0,
+          eyeOpen: 0.92,
+          mouthForm: -0.9,
+          browLY: -0.85,
+          browRY: -0.85,
+          browAngle: -0.85,
+          angleZ: -3.5,
+          cheek: 0.25
+        },
+        surpresa: {
+          label: "Surpresa",
+          expNames: ["f05", "F06", "surprised", "shock"],
+          eyeSmile: 0.0,
+          eyeOpen: 1.25,
+          mouthForm: -0.2,
+          browLY: 0.85,
+          browRY: 0.85,
+          browAngle: 0.35,
+          angleZ: 2.0,
+          cheek: 0.15
+        },
+        pensativa: {
+          label: "Pensativa",
+          expNames: ["f06", "F07", "thinking", "sad"],
+          eyeSmile: 0.1,
+          eyeOpen: 0.85,
+          mouthForm: -0.25,
+          browLY: -0.28,
+          browRY: 0.22,
+          browAngle: -0.2,
+          angleZ: -6.5,
+          cheek: 0.0
+        },
+        sarcasmo: {
+          label: "Sarcasmo",
+          expNames: ["f07", "F08", "smug", "sarcasm"],
+          eyeSmile: 0.5,
+          eyeOpen: 0.86,
+          mouthForm: 0.65,
+          browLY: 0.50,
+          browRY: -0.40,
+          browAngle: 0.15,
+          angleZ: 7.5,
+          cheek: 0.3
+        }
+      };
+
+      const STATE_LABELS = {
+        idle: "Inativa",
+        listening: "Ouvindo",
+        thinking: "Pensando",
+        speaking: "Falando"
+      };
+
+      const STATE_COLORS = {
+        idle: "#6b728e",
+        listening: "#4ade80",
+        thinking: "#fbbf24",
+        speaking: "#60a5fa"
+      };
+
+      const ACTION_METADATA = {
+        acenar: { badge: "👋 Acenando!", duration: 3.0, emotion: "feliz", mtnIdx: 1 },
+        feliz: { badge: "😊 Sorrindo!", duration: 2.8, emotion: "feliz", mtnIdx: 3 },
+        rir: { badge: "😆 Rindo!", duration: 2.8, emotion: "feliz", mtnIdx: 3 },
+        pensar: { badge: "🤔 Pensando...", duration: 3.0, emotion: "pensativa", mtnIdx: 5 },
+        bravo: { badge: "💢 Irritada!", duration: 2.6, emotion: "irritada", mtnIdx: 4 },
+        cantar: { badge: "🎵 Cantando!", duration: 3.8, emotion: "feliz", mtnIdx: 6 },
+        dancar: { badge: "💃 Dançando!", duration: 3.8, emotion: "feliz", mtnIdx: 6 },
+        bater_palma: { badge: "👏 Palmas!", duration: 2.6, emotion: "feliz", mtnIdx: 3 },
+        pular: { badge: "✨ Pulando!", duration: 2.0, emotion: "feliz", mtnIdx: 2 },
+        concordar: { badge: "🙆‍♀️ Concordando", duration: 2.0, emotion: "feliz", mtnIdx: 2 },
+        negar: { badge: "🙅‍♀️ Negando", duration: 2.0, emotion: "pensativa", mtnIdx: 4 }
+      };
+
+      const SEKAI_HAND_SUFFIXES = [
+        "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P"
+      ];
+
+      const canvas = document.getElementById("avatar-canvas");
+      const loadingOverlay = document.getElementById("loading-overlay");
+      const loadingText = document.getElementById("loading-text");
+      const hudLabel = document.getElementById("hud-label");
+      const hudDot = document.getElementById("hud-dot");
+      const actionToast = document.getElementById("action-toast");
+
+      let app = null;
+      let currentModel = null;
+      let isPaused = false;
+      let isMascotMode = false;
+      let currentState = "idle";
+      let currentEmotion = "neutra";
+
+      // Ajustes visuais configuráveis na aba "🎭 Modelos"
+      let userZoom = 1.0;
+      let userOffsetX = 0.0;
+      let userOffsetY = 0.0;
+      let lipSyncSensitivity = 1.0;
+      let baseModelX = 0.0;
+      let baseModelY = 0.0;
+
+      // LipSync (ParamMouthOpenY + AnalyserNode da Web Audio API)
+      let targetMouthOpen = 0.0;
+      let currentMouthOpen = 0.0;
+      let audioContext = null;
+      let analyserNode = null;
+      let analyserData = null;
+
+      // Gatilho de Ação 2D ativa ([acao: acenar], [acao: feliz], etc.)
+      let activeAction = null;
+      let activeActionElapsed = 0.0;
+      let activeActionDuration = 0.0;
+      let toastTimeout = null;
+
+      // Mouse Tracking & Mascot Dragging
+      let pointerNormX = 0.0;
+      let pointerNormY = 0.0;
+      let pointerActive = false;
+      let pointerLastMoveMs = 0;
+      let isDraggingMascot = false;
+      let dragMovedPixels = 0;
+      let dragStartScreenX = 0;
+      let dragStartScreenY = 0;
+
+      // Parâmetros interpolados a 60 FPS
+      // Nos modelos Project Sekai (sekai4), os dois braços (L e R) têm a MESMA convenção de sinal
+      // e ambos permanecem na camada frontal (Arm6=1.0, Arm9=0.9) para nunca ficar um na frente e outro atrás!
+      const smoothParams = {
+        angleX: 0.0,
+        angleY: 0.0,
+        angleZ: 0.0,
+        bodyAngleX: 0.0,
+        bodyAngleY: 0.0,
+        bodyAngleZ: 0.0,
+        upperBodyZ: 0.0,
+        // Haru Cubism 4 braços
+        armL: -0.15,
+        armR: -0.15,
+        armLB: 0.25,
+        armRB: 0.25,
+        handL: 0.0,
+        handR: 0.0,
+        // Project Sekai Cubism 4 articulação simétrica frontal completa (L1..9 e R1..9)
+        sekaiShoulderL: 3.0,
+        sekaiShoulderR: 3.0,
+        sekaiArmL1: -38.0,
+        sekaiArmL2: 36.0,
+        sekaiArmL3: 24.0,
+        sekaiArmL4: 10.0,
+        sekaiArmL5: 8.0,
+        sekaiArmL7: 5.0,
+        sekaiArmL8: 22.0,
+        sekaiArmR1: -38.0,
+        sekaiArmR2: 36.0,
+        sekaiArmR3: 24.0,
+        sekaiArmR4: 10.0,
+        sekaiArmR5: 8.0,
+        sekaiArmR7: 5.0,
+        sekaiArmR8: 22.0,
+        sekaiFingerL: 0.0,
+        sekaiFingerR: 0.0,
+        // Olhos e rosto
+        eyeBallX: 0.0,
+        eyeBallY: 0.0,
+        eyeLSmile: 0.0,
+        eyeRSmile: 0.0,
+        eyeLOpen: 1.0,
+        eyeROpen: 1.0,
+        mouthForm: 0.2,
+        browLY: 0.0,
+        browRY: 0.0,
+        browAngle: 0.0,
+        cheek: 0.0,
+        breath: 0.0
+      };
+
+      // Piscar de olhos natural
+      let blinkTimer = 2.6;
+      let blinkPhase = 0.0;
+
+      function lerp(current, target, factor) {
+        return current + (target - current) * Math.min(1.0, Math.max(0.0, factor));
+      }
+
+      function postToHost(payload) {
+        if (window.chrome && window.chrome.webview) {
+          try {
+            window.chrome.webview.postMessage(JSON.stringify(payload));
+          } catch (_e) {}
+        }
+      }
+
+      function resolveModelUrl(rawPath) {
+        if (!rawPath || !String(rawPath).trim()) {
+          return MIKU_SEKAI_DEFAULT_MODEL;
+        }
+        const trimmed = String(rawPath).trim().replace(/\\/g, "/");
+        if (trimmed.endsWith("miku_sekai/21miku_normal.model3.json")) {
+          return MIKU_SEKAI_DEFAULT_MODEL;
+        }
+        if (/^https?:\/\//i.test(trimmed)) {
+          return trimmed;
+        }
+        const cleanRel = trimmed.replace(/^\/+/, "");
+        return "https://rin.local/" + cleanRel;
+      }
+
+      function updateHud() {
+        const stLabel = STATE_LABELS[currentState] || "Inativa";
+        const emPreset = EMOTION_PRESETS[currentEmotion] || EMOTION_PRESETS.neutra;
+        hudLabel.textContent = isPaused
+          ? "Economia de GPU (0%)"
+          : `${stLabel} · ${emPreset.label}`;
+        hudDot.style.background = isPaused ? "#6b728e" : (STATE_COLORS[currentState] || "#4ade80");
+        hudDot.style.boxShadow = isPaused ? "none" : `0 0 8px ${STATE_COLORS[currentState] || "#4ade80"}`;
+      }
+
+      function showActionToast(text, durationMs) {
+        if (!actionToast) return;
+        actionToast.textContent = text;
+        actionToast.classList.add("visible");
+        if (toastTimeout) clearTimeout(toastTimeout);
+        toastTimeout = setTimeout(function () {
+          actionToast.classList.remove("visible");
+        }, durationMs || 2200);
+      }
+
+      function detectRigType(model) {
+        if (!model || !model.internalModel || !model.internalModel.coreModel) {
+          return "unknown";
+        }
+        const core = model.internalModel.coreModel;
+        if (typeof core.setParamFloat === "function") {
+          return "cubism2";
+        }
+        if (core._model && core._model.parameters && Array.isArray(core._model.parameters.ids)) {
+          const ids = core._model.parameters.ids;
+          if (ids.includes("ParamArmL1") || ids.includes("ParamShoulderL")) {
+            return "sekai4";
+          }
+          if (ids.includes("ParamArmLA") || ids.includes("ParamArmLB")) {
+            return "haru4";
+          }
+        }
+        return "cubism4";
+      }
+
+      function fitModelToStage() {
+        if (!currentModel || !app) return;
+        const w = app.renderer.screen.width;
+        const h = app.renderer.screen.height;
+        if (w <= 10 || h <= 10) return;
+
+        currentModel.scale.set(1.0);
+        const origW = currentModel.width || 1000;
+        const origH = currentModel.height || 1600;
+        const rigType = detectRigType(currentModel);
+
+        let multW = 1.15;
+        let multH = 1.32;
+        let anchorY = 0.62;
+
+        if (rigType === "sekai4") {
+          multW = isMascotMode ? 1.18 : 1.22;
+          multH = isMascotMode ? 1.26 : 1.34;
+          anchorY = isMascotMode ? 0.60 : 0.63;
+        } else if (rigType === "cubism2") {
+          multW = 1.06;
+          multH = 1.08;
+          anchorY = 0.55;
+        } else if (rigType === "haru4") {
+          multW = 1.15;
+          multH = 1.48;
+          anchorY = 0.72;
+        }
+
+        const scaleX = (w * multW) / origW;
+        const scaleY = (h * multH) / origH;
+        const scale = Math.min(scaleX, scaleY) * userZoom;
+
+        currentModel.scale.set(scale);
+        currentModel.anchor.set(0.5, 0.5);
+        baseModelX = w * 0.5 + userOffsetX;
+        baseModelY = h * anchorY + userOffsetY;
+        currentModel.x = baseModelX;
+        currentModel.y = baseModelY;
+      }
+
+      function setDualParam(coreModel, id4, id2, value, weight) {
+        if (!coreModel) return;
+        const w = weight === undefined ? 1.0 : weight;
+        try {
+          if (typeof coreModel.setParameterValueById === "function" && id4) {
+            coreModel.setParameterValueById(id4, value, w);
+          } else if (typeof coreModel.setParamFloat === "function" && id2) {
+            coreModel.setParamFloat(id2, value, w);
+          }
+        } catch (_e) {}
+      }
+
+      function addDualParam(coreModel, id4, id2, delta) {
+        if (!coreModel) return;
+        try {
+          if (typeof coreModel.addParameterValueById === "function" && id4) {
+            coreModel.addParameterValueById(id4, delta, 1.0);
+          } else if (typeof coreModel.addToParamFloat === "function" && id2) {
+            coreModel.addToParamFloat(id2, delta, 1.0);
+          }
+        } catch (_e) {}
+      }
+
+      // Seleciona exatamente 1 sprite de mão frontal nos modelos Project Sekai (zerando os demais)
+      function setSekaiHandSprite(coreModel, side, activeSuffix) {
+        for (let i = 0; i < SEKAI_HAND_SUFFIXES.length; i++) {
+          const sfx = SEKAI_HAND_SUFFIXES[i];
+          const val = sfx === activeSuffix ? 1.0 : 0.0;
+          coreModel.setParameterValueById("ParamHand" + side + sfx, val, 1.0);
+        }
+      }
+
+      function ensureWebAudioAnalyser() {
+        if (!audioContext) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtx) {
+            audioContext = new AudioCtx();
+          }
+        }
+        if (audioContext && !analyserNode) {
+          analyserNode = audioContext.createAnalyser();
+          analyserNode.fftSize = 256;
+          analyserNode.smoothingTimeConstant = 0.55;
+          analyserData = new Uint8Array(analyserNode.frequencyBinCount);
+        }
+        return analyserNode;
+      }
+
+      function sampleWebAudioMouthOpen() {
+        if (!analyserNode || !analyserData) return 0.0;
+        analyserNode.getByteTimeDomainData(analyserData);
+        let sumSq = 0.0;
+        for (let i = 0; i < analyserData.length; i++) {
+          const norm = (analyserData[i] - 128.0) / 128.0;
+          sumSq += norm * norm;
+        }
+        const rms = Math.sqrt(sumSq / analyserData.length);
+        if (rms < 0.008) return 0.0;
+        return Math.min(1.0, rms * 4.8 * lipSyncSensitivity);
+      }
+
+      function feedAudioEnvelopeToWebAudio(rmsValue) {
+        const scaled = Math.min(1.0, Math.max(0.0, Number(rmsValue) || 0.0) * lipSyncSensitivity);
+        targetMouthOpen = scaled <= 0.01 ? 0.0 : scaled;
+      }
+
+      function connectAudioElement(audioElem) {
+        try {
+          const analyser = ensureWebAudioAnalyser();
+          if (!analyser || !audioContext) return;
+          if (audioContext.state === "suspended") {
+            audioContext.resume();
+          }
+          const src = audioContext.createMediaElementSource(audioElem);
+          src.connect(analyser);
+          analyser.connect(audioContext.destination);
+        } catch (err) {
+          console.warn("[RinLive2D] Erro ao conectar AnalyserNode:", err);
+        }
+      }
+
+      function triggerAction(actionName) {
+        const key = String(actionName || "").trim().toLowerCase();
+        const meta = ACTION_METADATA[key];
+        if (!meta) return;
+
+        activeAction = key;
+        activeActionElapsed = 0.0;
+        activeActionDuration = meta.duration;
+        if (meta.emotion) {
+          applyEmotionToModel(meta.emotion);
+        }
+        showActionToast(meta.badge, meta.duration * 1000);
+
+        if (currentModel) {
+          const rigType = detectRigType(currentModel);
+          try {
+            // Para o modelo clássico (cubism2) ou Haru, aciona a motion nativa;
+            // nos modelos Project Sekai (sekai4), nosso controlador 60 FPS controla os 2 braços
+            // simetricamente na frente do corpo para nunca jogar um braço para trás!
+            if (rigType === "cubism2") {
+              currentModel.motion("null", meta.mtnIdx || 1);
+            } else if (rigType === "haru4") {
+              currentModel.motion("Tap");
+            }
+          } catch (_e) {}
+        }
+      }
+
+      function setupModelController(model) {
+        const internalModel = model.internalModel;
+        if (!internalModel) return;
+
+        const rigType = detectRigType(model);
+        let lastTime = performance.now();
+
+        // Nos modelos Project Sekai, desativa o auto-idle que deixava um braço pra frente e outro pra trás
+        if (rigType === "sekai4") {
+          try {
+            if (internalModel.motionManager) {
+              internalModel.motionManager.stopAllMotions();
+              internalModel.motionManager.groups.idle = "__disabled_idle__";
+            }
+          } catch (_e) {}
+        }
+
+        internalModel.on("beforeModelUpdate", function () {
+          const now = performance.now();
+          const dt = Math.min(0.1, Math.max(0.001, (now - lastTime) / 1000.0));
+          lastTime = now;
+          const t = now * 0.001;
+
+          const coreModel = internalModel.coreModel;
+          if (!coreModel) return;
+
+          const preset = EMOTION_PRESETS[currentEmotion] || EMOTION_PRESETS.neutra;
+
+          // 1. Respiração suave contínua (ParamBreath / PARAM_BREATH)
+          smoothParams.breath = (Math.sin(t * 2.2) + 1.0) * 0.5;
+
+          // 2. Estado base + Postura simétrica frontal dos dois braços no Project Sekai
+          let targetAngleX = 0.0;
+          let targetAngleY = 0.0;
+          let targetAngleZ = preset.angleZ;
+          let targetBodyX = 0.0;
+          let targetBodyY = 0.0;
+          let targetBodyZ = 0.0;
+          let targetUpperBodyZ = 0.0;
+
+          // Haru braços
+          let targetArmL = -0.18 + Math.sin(t * 1.35) * 0.14;
+          let targetArmR = -0.18 + Math.cos(t * 1.35) * 0.14;
+          let targetArmLB = 0.28 + Math.sin(t * 1.7) * 0.12;
+          let targetArmRB = 0.28 + Math.cos(t * 1.7) * 0.12;
+          let targetHandL = Math.sin(t * 2.0) * 0.2;
+          let targetHandR = Math.cos(t * 2.0) * 0.2;
+
+          // Project Sekai: AMBOS os braços (L e R) usam a MESMA convenção de sinais no rig!
+          // (Arm1=-38, Arm2=+36, Arm3=+24, Arm4=+10, Arm5=+8, Arm6=1.0, Arm7=+5, Arm8=+22, Arm9=+0.9)
+          let targetSekaiShoulderL = 3.0 + Math.sin(t * 1.8) * 1.5;
+          let targetSekaiShoulderR = 3.0 + Math.sin(t * 1.8) * 1.5;
+          let targetSekaiArmL1 = -38.0 + Math.sin(t * 1.2) * 2.5;
+          let targetSekaiArmL2 = 36.0 + Math.sin(t * 1.5) * 3.5;
+          let targetSekaiArmL3 = 24.0 + Math.cos(t * 1.7) * 5.0;
+          let targetSekaiArmL4 = 10.0 + Math.sin(t * 1.4) * 2.5;
+          let targetSekaiArmL5 = 8.0;
+          let targetSekaiArmL7 = 5.0;
+          let targetSekaiArmL8 = 22.0 + Math.sin(t * 1.3) * 4.0;
+
+          let targetSekaiArmR1 = -38.0 + Math.cos(t * 1.2) * 2.5;
+          let targetSekaiArmR2 = 36.0 + Math.cos(t * 1.5) * 3.5;
+          let targetSekaiArmR3 = 24.0 + Math.sin(t * 1.7) * 5.0;
+          let targetSekaiArmR4 = 10.0 + Math.cos(t * 1.4) * 2.5;
+          let targetSekaiArmR5 = 8.0;
+          let targetSekaiArmR7 = 5.0;
+          let targetSekaiArmR8 = 22.0 + Math.cos(t * 1.3) * 4.0;
+
+          let targetSekaiFingerL = Math.sin(t * 2.0) * 2.0;
+          let targetSekaiFingerR = Math.cos(t * 2.0) * 2.0;
+          let activeHandL = "F";
+          let activeHandR = "F";
+
+          let targetEyeX = 0.0;
+          let targetEyeY = 0.0;
+          let targetEyeSmile = preset.eyeSmile;
+          let targetMouthForm = preset.mouthForm;
+          let targetCheek = preset.cheek;
+          let stateEyeOpenBoost = 1.0;
+          let stageBounceY = 0.0;
+
+          if (currentState === "idle") {
+            targetAngleX = Math.sin(t * 0.9) * 4.5;
+            targetAngleY = Math.cos(t * 0.7) * 2.8;
+            targetAngleZ += Math.sin(t * 0.6) * 2.8;
+            targetBodyX = Math.sin(t * 0.6) * 2.2;
+            targetBodyZ = Math.cos(t * 0.5) * 1.8;
+            targetUpperBodyZ = Math.sin(t * 0.5) * 1.6;
+          } else if (currentState === "listening") {
+            targetAngleX = Math.sin(t * 1.1) * 2.5;
+            targetAngleY = 3.5 + Math.sin(t * 1.4) * 1.5;
+            targetAngleZ = 8.0 + Math.sin(t * 0.9) * 1.5;
+            targetBodyX = 2.5;
+            stateEyeOpenBoost = 1.18;
+            targetSekaiArmL2 = 40.0;
+            targetSekaiArmR2 = 40.0;
+            targetSekaiArmL4 = 16.0;
+            targetSekaiArmR4 = 16.0;
+          } else if (currentState === "thinking") {
+            targetAngleX = -9.0 + Math.sin(t * 1.5) * 3.0;
+            targetAngleY = 11.0 + Math.cos(t * 1.2) * 2.5;
+            targetAngleZ = -7.0 + Math.sin(t * 1.0) * 2.0;
+            targetEyeX = 0.58 + Math.sin(t * 1.8) * 0.15;
+            targetEyeY = 0.65 + Math.cos(t * 1.4) * 0.12;
+            stateEyeOpenBoost = 0.92;
+            // Mão direita próxima ao queixo pensando (baseado em w-adult05-think)
+            targetSekaiArmR1 = -36.0;
+            targetSekaiArmR2 = 43.0;
+            targetSekaiArmR3 = 8.0 + Math.sin(t * 2.5) * 4.0;
+            targetSekaiArmR4 = 20.0;
+            targetSekaiArmR8 = 12.0;
+            activeHandR = "J";
+          } else if (currentState === "speaking") {
+            const speechEnergy = Math.max(targetMouthOpen, currentMouthOpen, 0.22);
+            targetAngleX = Math.sin(t * 3.4) * (4.0 + speechEnergy * 6.5);
+            targetAngleY = Math.abs(Math.sin(t * 5.2)) * (speechEnergy * 8.0) - 2.0;
+            targetAngleZ = preset.angleZ + Math.cos(t * 2.7) * (3.5 + speechEnergy * 5.0);
+            targetBodyX = Math.sin(t * 2.4) * (2.5 + speechEnergy * 4.0);
+            targetBodyZ = Math.cos(t * 2.4) * (2.0 + speechEnergy * 3.0);
+            targetUpperBodyZ = Math.sin(t * 2.4) * (2.0 + speechEnergy * 2.5);
+
+            // Gesticulação simétrica frontal enquanto fala
+            const gL = Math.sin(t * 4.2);
+            const gR = Math.cos(t * 3.8);
+            targetSekaiShoulderL = 4.0 + gL * 2.5 * speechEnergy;
+            targetSekaiShoulderR = 4.0 + gR * 2.5 * speechEnergy;
+            targetSekaiArmL1 = -34.0 + gL * (4.0 + speechEnergy * 5.0);
+            targetSekaiArmL2 = 39.0 + Math.abs(gL) * (4.0 + speechEnergy * 5.0);
+            targetSekaiArmL3 = 24.0 + gR * (10.0 + speechEnergy * 10.0);
+            targetSekaiArmL4 = 15.0 + Math.abs(gL) * (8.0 * speechEnergy);
+            targetSekaiArmL8 = 24.0 + gL * 10.0;
+
+            targetSekaiArmR1 = -34.0 + gR * (4.0 + speechEnergy * 5.0);
+            targetSekaiArmR2 = 39.0 + Math.abs(gR) * (4.0 + speechEnergy * 5.0);
+            targetSekaiArmR3 = 24.0 + gL * (10.0 + speechEnergy * 10.0);
+            targetSekaiArmR4 = 15.0 + Math.abs(gR) * (8.0 * speechEnergy);
+            targetSekaiArmR8 = 24.0 + gR * 10.0;
+
+            targetArmL = 0.1 + gL * (0.25 + speechEnergy * 0.35);
+            targetArmR = 0.1 + gR * (0.25 + speechEnergy * 0.35);
+          }
+
+          // 3. Gatilhos de Ação 2D ([acao: acenar], [acao: feliz], [acao: rir], [acao: pensar], [acao: bravo], [acao: cantar])
+          let actionMouthOverride = null;
+          if (activeAction) {
+            activeActionElapsed += dt;
+            const p = activeActionElapsed;
+            const fade = Math.min(1.0, Math.min(p / 0.18, (activeActionDuration - p) / 0.28));
+
+            if (activeAction === "acenar") {
+              // Baseado em w-adult01-shakehand do Project Sekai, com elevação máxima do braço direito!
+              // ParamArmR1=-15, ParamArmR2=48, ParamArmR4=28 (eleva o antebraço bem alto!),
+              // ParamArmR5=9, ParamArmR7=10, ParamHandRI=1 (mão aberta acenando!)
+              const waveCycle = Math.sin(p * 10.5);
+              targetAngleZ = waveCycle * 14.0 * fade;
+              targetAngleX = Math.cos(p * 5.25) * 8.0 * fade;
+              targetAngleY = 6.0 * fade;
+              targetBodyZ = waveCycle * 5.0 * fade;
+              targetBodyX = Math.sin(p * 5.25) * 4.0 * fade;
+              targetUpperBodyZ = waveCycle * 4.5 * fade;
+
+              targetSekaiShoulderR = lerp(targetSekaiShoulderR, 9.5, fade);
+              targetSekaiArmR1 = lerp(targetSekaiArmR1, -14.0, fade);
+              targetSekaiArmR2 = lerp(targetSekaiArmR2, 48.0, fade);
+              targetSekaiArmR4 = lerp(targetSekaiArmR4, 28.0, fade);
+              targetSekaiArmR5 = lerp(targetSekaiArmR5, 9.0, fade);
+              targetSekaiArmR7 = lerp(targetSekaiArmR7, 10.0, fade);
+              targetSekaiArmR8 = lerp(targetSekaiArmR8, 4.0 + waveCycle * 36.0, fade);
+              targetSekaiArmR3 = lerp(targetSekaiArmR3, 8.0 + waveCycle * 32.0, fade);
+              targetSekaiFingerR = waveCycle * 8.0 * fade;
+              activeHandR = "I"; // Mão aberta acenando no Project Sekai!
+
+              // Braço esquerdo permanece simétrico e natural na frente
+              targetSekaiShoulderL = lerp(targetSekaiShoulderL, 3.5, fade);
+              targetSekaiArmL1 = lerp(targetSekaiArmL1, -38.0, fade);
+              targetSekaiArmL2 = lerp(targetSekaiArmL2, 37.0, fade);
+              targetSekaiArmL3 = lerp(targetSekaiArmL3, 28.0, fade);
+              targetSekaiArmL4 = lerp(targetSekaiArmL4, 12.0, fade);
+              targetSekaiArmL8 = lerp(targetSekaiArmL8, 22.0, fade);
+              activeHandL = "F";
+
+              targetArmR = (0.8 + 0.2 * waveCycle) * fade;
+              targetArmRB = (0.85 + 0.15 * waveCycle) * fade;
+              targetHandR = waveCycle * 0.9 * fade;
+
+              targetEyeSmile = 1.0;
+              targetMouthForm = 1.0;
+              targetCheek = 0.65;
+              stageBounceY = Math.abs(Math.sin(p * 8.5)) * -6.0 * fade;
+            } else if (activeAction === "feliz" || activeAction === "rir") {
+              const laughBounce = activeAction === "rir" ? Math.abs(Math.sin(p * 14.0)) : Math.sin(p * 5.5);
+              targetEyeSmile = 1.0;
+              stateEyeOpenBoost = 0.15;
+              targetMouthForm = 1.0;
+              targetCheek = 0.85;
+              targetAngleZ = (11.0 + Math.sin(p * 6.0) * 6.0) * fade;
+              targetAngleY = (8.0 + laughBounce * 8.0) * fade;
+              targetBodyY = laughBounce * 5.0 * fade;
+              stageBounceY = laughBounce * -8.0 * fade;
+
+              // Ambos os braços erguidos simetricamente na frente comemorando!
+              targetSekaiShoulderL = lerp(targetSekaiShoulderL, 7.5, fade);
+              targetSekaiShoulderR = lerp(targetSekaiShoulderR, 7.5, fade);
+              targetSekaiArmL1 = lerp(targetSekaiArmL1, -24.0 + laughBounce * 6.0, fade);
+              targetSekaiArmL2 = lerp(targetSekaiArmL2, 44.0, fade);
+              targetSekaiArmL3 = lerp(targetSekaiArmL3, 32.0, fade);
+              targetSekaiArmL4 = lerp(targetSekaiArmL4, 25.0, fade);
+              targetSekaiArmL8 = lerp(targetSekaiArmL8, 32.0, fade);
+
+              targetSekaiArmR1 = lerp(targetSekaiArmR1, -24.0 + laughBounce * 6.0, fade);
+              targetSekaiArmR2 = lerp(targetSekaiArmR2, 44.0, fade);
+              targetSekaiArmR3 = lerp(targetSekaiArmR3, 32.0, fade);
+              targetSekaiArmR4 = lerp(targetSekaiArmR4, 25.0, fade);
+              targetSekaiArmR8 = lerp(targetSekaiArmR8, 32.0, fade);
+
+              if (activeAction === "rir") {
+                actionMouthOverride = 0.35 + 0.45 * Math.abs(Math.sin(p * 14.0));
+              }
+            } else if (activeAction === "pensar") {
+              targetAngleZ = -14.0 * fade;
+              targetAngleX = -10.0 * fade;
+              targetAngleY = 12.0 * fade;
+              targetEyeX = 0.65 * fade;
+              targetEyeY = 0.72 * fade;
+              targetMouthForm = -0.35;
+              stateEyeOpenBoost = 0.85;
+
+              // Pose de reflexão w-adult05-think (ambos os braços na frente, mão direita no queixo)
+              targetSekaiArmR1 = lerp(targetSekaiArmR1, -35.0, fade);
+              targetSekaiArmR2 = lerp(targetSekaiArmR2, 43.0, fade);
+              targetSekaiArmR3 = lerp(targetSekaiArmR3, 8.0, fade);
+              targetSekaiArmR4 = lerp(targetSekaiArmR4, 22.0, fade);
+              targetSekaiArmR8 = lerp(targetSekaiArmR8, 12.0, fade);
+              activeHandR = "J";
+
+              targetSekaiArmL1 = lerp(targetSekaiArmL1, -38.0, fade);
+              targetSekaiArmL2 = lerp(targetSekaiArmL2, 34.0, fade);
+              targetSekaiArmL3 = lerp(targetSekaiArmL3, 22.0, fade);
+              targetSekaiArmL4 = lerp(targetSekaiArmL4, 14.0, fade);
+              activeHandL = "D";
+            } else if (activeAction === "bravo") {
+              const shake = Math.sin(p * 16.0);
+              targetAngleX = shake * 14.0 * fade;
+              targetAngleY = -10.0 * fade;
+              targetAngleZ = shake * 5.0 * fade;
+              targetMouthForm = -1.0;
+              targetEyeSmile = 0.0;
+              targetCheek = 0.5;
+              stageBounceY = Math.abs(shake) * -5.0 * fade;
+
+              targetSekaiShoulderL = lerp(targetSekaiShoulderL, 7.0, fade);
+              targetSekaiShoulderR = lerp(targetSekaiShoulderR, 7.0, fade);
+              targetSekaiArmL1 = lerp(targetSekaiArmL1, -28.0, fade);
+              targetSekaiArmL2 = lerp(targetSekaiArmL2, 40.0 + shake * 4.0, fade);
+              targetSekaiArmL3 = lerp(targetSekaiArmL3, 34.0, fade);
+              targetSekaiArmL4 = lerp(targetSekaiArmL4, 18.0, fade);
+              targetSekaiArmR1 = lerp(targetSekaiArmR1, -28.0, fade);
+              targetSekaiArmR2 = lerp(targetSekaiArmR2, 40.0 - shake * 4.0, fade);
+              targetSekaiArmR3 = lerp(targetSekaiArmR3, 34.0, fade);
+              targetSekaiArmR4 = lerp(targetSekaiArmR4, 18.0, fade);
+              activeHandL = "J";
+              activeHandR = "J";
+            } else if (activeAction === "cantar" || activeAction === "dancar") {
+              const beat = p * (185.0 / 60.0) * Math.PI;
+              const sway = Math.sin(beat * 0.5);
+              const alt = Math.cos(beat * 0.5);
+              const bounce = Math.abs(Math.sin(beat));
+              targetAngleZ = sway * 18.0 * fade;
+              targetAngleX = alt * 14.0 * fade;
+              targetAngleY = (bounce * 12.0 - 4.0) * fade;
+              targetBodyZ = sway * 8.5 * fade;
+              targetBodyX = alt * 6.5 * fade;
+              targetUpperBodyZ = sway * 6.5 * fade;
+
+              // Coreografia com os dois braços sempre na camada frontal!
+              targetSekaiShoulderL = lerp(targetSekaiShoulderL, 6.0 + sway * 3.5, fade);
+              targetSekaiShoulderR = lerp(targetSekaiShoulderR, 6.0 - sway * 3.5, fade);
+              targetSekaiArmL1 = lerp(targetSekaiArmL1, -24.0 + sway * 10.0, fade);
+              targetSekaiArmL2 = lerp(targetSekaiArmL2, 42.0 + bounce * 6.0, fade);
+              targetSekaiArmL3 = lerp(targetSekaiArmL3, 20.0 + alt * 18.0, fade);
+              targetSekaiArmL4 = lerp(targetSekaiArmL4, 22.0 + sway * 6.0, fade);
+              targetSekaiArmL8 = lerp(targetSekaiArmL8, 20.0 + sway * 18.0, fade);
+
+              targetSekaiArmR1 = lerp(targetSekaiArmR1, -24.0 - sway * 10.0, fade);
+              targetSekaiArmR2 = lerp(targetSekaiArmR2, 42.0 + bounce * 6.0, fade);
+              targetSekaiArmR3 = lerp(targetSekaiArmR3, 20.0 - alt * 18.0, fade);
+              targetSekaiArmR4 = lerp(targetSekaiArmR4, 22.0 - sway * 6.0, fade);
+              targetSekaiArmR8 = lerp(targetSekaiArmR8, 20.0 - sway * 18.0, fade);
+              activeHandL = "I";
+              activeHandR = "I";
+
+              targetEyeSmile = 0.9;
+              targetMouthForm = 1.0;
+              targetCheek = 0.75;
+              stageBounceY = bounce * -12.0 * fade;
+              if (targetMouthOpen <= 0.05) {
+                actionMouthOverride = 0.25 + 0.65 * Math.abs(Math.sin(beat * 1.5));
+              }
+            } else if (activeAction === "bater_palma" || activeAction === "pular") {
+              const clap = Math.abs(Math.sin(p * 12.0));
+              targetAngleY = clap * 14.0 * fade;
+              targetAngleZ = Math.sin(p * 6.0) * 10.0 * fade;
+              targetEyeSmile = 1.0;
+              targetMouthForm = 1.0;
+              stageBounceY = clap * -15.0 * fade;
+              targetSekaiArmL1 = lerp(targetSekaiArmL1, -26.0, fade);
+              targetSekaiArmL2 = lerp(targetSekaiArmL2, 44.0, fade);
+              targetSekaiArmL4 = lerp(targetSekaiArmL4, 24.0, fade);
+              targetSekaiArmL3 = lerp(targetSekaiArmL3, 20.0 + clap * 18.0, fade);
+              targetSekaiArmR1 = lerp(targetSekaiArmR1, -26.0, fade);
+              targetSekaiArmR2 = lerp(targetSekaiArmR2, 44.0, fade);
+              targetSekaiArmR4 = lerp(targetSekaiArmR4, 24.0, fade);
+              targetSekaiArmR3 = lerp(targetSekaiArmR3, 20.0 + clap * 18.0, fade);
+            } else if (activeAction === "concordar") {
+              targetAngleY = Math.sin(p * 12.0) * 18.0 * fade;
+              targetMouthForm = 0.8;
+            } else if (activeAction === "negar") {
+              targetAngleX = Math.sin(p * 14.0) * 20.0 * fade;
+            }
+
+            if (activeActionElapsed >= activeActionDuration) {
+              activeAction = null;
+            }
+          }
+
+          // 4. Interação com o cursor do mouse
+          if (pointerActive && (now - pointerLastMoveMs) < 3500 && currentState !== "thinking" && !activeAction) {
+            targetAngleX += pointerNormX * 18.0;
+            targetAngleY += pointerNormY * 14.0;
+            targetBodyX += pointerNormX * 6.0;
+            targetEyeX = lerp(targetEyeX, pointerNormX * 0.85, 0.85);
+            targetEyeY = lerp(targetEyeY, pointerNormY * 0.75, 0.85);
+          }
+
+          // 5. Piscar de olhos natural
+          blinkTimer -= dt;
+          if (blinkTimer <= 0.0 && blinkPhase <= 0.0) {
+            blinkPhase = 0.16;
+            blinkTimer = 2.4 + Math.random() * 3.2;
+          }
+          let blinkFactor = 1.0;
+          if (blinkPhase > 0.0) {
+            blinkPhase = Math.max(0.0, blinkPhase - dt);
+            const normBlink = 1.0 - Math.abs((blinkPhase / 0.16) * 2.0 - 1.0);
+            blinkFactor = Math.max(0.0, 1.0 - normBlink * 1.15);
+          }
+
+          const targetEyeOpen = Math.min(1.3, preset.eyeOpen * stateEyeOpenBoost) * blinkFactor;
+
+          // 6. LipSync Perfeito a 60 FPS
+          const webAudioMouth = sampleWebAudioMouthOpen();
+          let rawMouth = Math.max(targetMouthOpen, webAudioMouth);
+          if (actionMouthOverride !== null && rawMouth <= 0.05) {
+            rawMouth = actionMouthOverride;
+          }
+          if (rawMouth > 0.02) {
+            const syllableWave = 0.84 + 0.16 * Math.sin(t * 28.0);
+            rawMouth = Math.min(1.0, rawMouth * syllableWave);
+            currentMouthOpen = lerp(currentMouthOpen, rawMouth, Math.min(1.0, dt * 32.0));
+          } else {
+            currentMouthOpen = lerp(currentMouthOpen, 0.0, Math.min(1.0, dt * 38.0));
+            if (currentMouthOpen < 0.015) {
+              currentMouthOpen = 0.0;
+            }
+          }
+
+          // 7. Interpolação suave (60 FPS)
+          const speed = Math.min(1.0, dt * 9.5);
+          const armSpeed = Math.min(1.0, dt * 12.0);
+          smoothParams.angleX = lerp(smoothParams.angleX, targetAngleX, speed);
+          smoothParams.angleY = lerp(smoothParams.angleY, targetAngleY, speed);
+          smoothParams.angleZ = lerp(smoothParams.angleZ, targetAngleZ, speed);
+          smoothParams.bodyAngleX = lerp(smoothParams.bodyAngleX, targetBodyX, speed);
+          smoothParams.bodyAngleY = lerp(smoothParams.bodyAngleY, targetBodyY, speed);
+          smoothParams.bodyAngleZ = lerp(smoothParams.bodyAngleZ, targetBodyZ, speed);
+          smoothParams.upperBodyZ = lerp(smoothParams.upperBodyZ, targetUpperBodyZ, speed);
+
+          smoothParams.armL = lerp(smoothParams.armL, targetArmL, armSpeed);
+          smoothParams.armR = lerp(smoothParams.armR, targetArmR, armSpeed);
+          smoothParams.armLB = lerp(smoothParams.armLB, targetArmLB, armSpeed);
+          smoothParams.armRB = lerp(smoothParams.armRB, targetArmRB, armSpeed);
+          smoothParams.handL = lerp(smoothParams.handL, targetHandL, armSpeed);
+          smoothParams.handR = lerp(smoothParams.handR, targetHandR, armSpeed);
+
+          smoothParams.sekaiShoulderL = lerp(smoothParams.sekaiShoulderL, targetSekaiShoulderL, armSpeed);
+          smoothParams.sekaiShoulderR = lerp(smoothParams.sekaiShoulderR, targetSekaiShoulderR, armSpeed);
+          smoothParams.sekaiArmL1 = lerp(smoothParams.sekaiArmL1, targetSekaiArmL1, armSpeed);
+          smoothParams.sekaiArmL2 = lerp(smoothParams.sekaiArmL2, targetSekaiArmL2, armSpeed);
+          smoothParams.sekaiArmL3 = lerp(smoothParams.sekaiArmL3, targetSekaiArmL3, armSpeed);
+          smoothParams.sekaiArmL4 = lerp(smoothParams.sekaiArmL4, targetSekaiArmL4, armSpeed);
+          smoothParams.sekaiArmL5 = lerp(smoothParams.sekaiArmL5, targetSekaiArmL5, armSpeed);
+          smoothParams.sekaiArmL7 = lerp(smoothParams.sekaiArmL7, targetSekaiArmL7, armSpeed);
+          smoothParams.sekaiArmL8 = lerp(smoothParams.sekaiArmL8, targetSekaiArmL8, armSpeed);
+
+          smoothParams.sekaiArmR1 = lerp(smoothParams.sekaiArmR1, targetSekaiArmR1, armSpeed);
+          smoothParams.sekaiArmR2 = lerp(smoothParams.sekaiArmR2, targetSekaiArmR2, armSpeed);
+          smoothParams.sekaiArmR3 = lerp(smoothParams.sekaiArmR3, targetSekaiArmR3, armSpeed);
+          smoothParams.sekaiArmR4 = lerp(smoothParams.sekaiArmR4, targetSekaiArmR4, armSpeed);
+          smoothParams.sekaiArmR5 = lerp(smoothParams.sekaiArmR5, targetSekaiArmR5, armSpeed);
+          smoothParams.sekaiArmR7 = lerp(smoothParams.sekaiArmR7, targetSekaiArmR7, armSpeed);
+          smoothParams.sekaiArmR8 = lerp(smoothParams.sekaiArmR8, targetSekaiArmR8, armSpeed);
+
+          smoothParams.sekaiFingerL = lerp(smoothParams.sekaiFingerL, targetSekaiFingerL, armSpeed);
+          smoothParams.sekaiFingerR = lerp(smoothParams.sekaiFingerR, targetSekaiFingerR, armSpeed);
+
+          smoothParams.eyeBallX = lerp(smoothParams.eyeBallX, targetEyeX, Math.min(1.0, dt * 14.0));
+          smoothParams.eyeBallY = lerp(smoothParams.eyeBallY, targetEyeY, Math.min(1.0, dt * 14.0));
+
+          smoothParams.eyeLSmile = lerp(smoothParams.eyeLSmile, targetEyeSmile, speed);
+          smoothParams.eyeRSmile = lerp(smoothParams.eyeRSmile, targetEyeSmile, speed);
+          smoothParams.eyeLOpen = lerp(smoothParams.eyeLOpen, targetEyeOpen, Math.min(1.0, dt * 24.0));
+          smoothParams.eyeROpen = lerp(smoothParams.eyeROpen, targetEyeOpen, Math.min(1.0, dt * 24.0));
+          smoothParams.mouthForm = lerp(smoothParams.mouthForm, targetMouthForm, speed);
+          smoothParams.browLY = lerp(smoothParams.browLY, preset.browLY, speed);
+          smoothParams.browRY = lerp(smoothParams.browRY, preset.browRY, speed);
+          smoothParams.browAngle = lerp(smoothParams.browAngle, preset.browAngle, speed);
+          smoothParams.cheek = lerp(smoothParams.cheek, targetCheek, speed);
+
+          if (currentModel && baseModelY > 0) {
+            currentModel.x = baseModelX;
+            currentModel.y = lerp(currentModel.y, baseModelY + stageBounceY, Math.min(1.0, dt * 18.0));
+          }
+
+          // 8. Aplicação nos parâmetros Live2D
+          setDualParam(coreModel, "ParamBreath", "PARAM_BREATH", smoothParams.breath, 1.0);
+          addDualParam(coreModel, "ParamAngleX", "PARAM_ANGLE_X", smoothParams.angleX);
+          addDualParam(coreModel, "ParamAngleY", "PARAM_ANGLE_Y", smoothParams.angleY);
+          addDualParam(coreModel, "ParamAngleZ", "PARAM_ANGLE_Z", smoothParams.angleZ);
+          addDualParam(coreModel, "ParamBodyAngleX", "PARAM_BODY_ANGLE_X", smoothParams.bodyAngleX);
+          addDualParam(coreModel, "ParamBodyAngleY", "PARAM_BODY_ANGLE_Y", smoothParams.bodyAngleY);
+          addDualParam(coreModel, "ParamBodyAngleZ", "PARAM_BODY_ANGLE_Z", smoothParams.bodyAngleZ);
+
+          if (rigType === "sekai4") {
+            // Garante SEMPRE os dois braços na camada da frente (ParamArmL6=1, ParamArmR6=1, ParamArmL9=0.9, ParamArmR9=0.9)
+            setDualParam(coreModel, "ParamUpperBodyZ", null, smoothParams.upperBodyZ, 1.0);
+            setDualParam(coreModel, "ParamShoulderL", null, smoothParams.sekaiShoulderL, 1.0);
+            setDualParam(coreModel, "ParamShoulderR", null, smoothParams.sekaiShoulderR, 1.0);
+
+            setDualParam(coreModel, "ParamArmL1", null, smoothParams.sekaiArmL1, 1.0);
+            setDualParam(coreModel, "ParamArmL2", null, smoothParams.sekaiArmL2, 1.0);
+            setDualParam(coreModel, "ParamArmL3", null, smoothParams.sekaiArmL3, 1.0);
+            setDualParam(coreModel, "ParamArmL4", null, smoothParams.sekaiArmL4, 1.0);
+            setDualParam(coreModel, "ParamArmL5", null, smoothParams.sekaiArmL5, 1.0);
+            setDualParam(coreModel, "ParamArmL6", null, 1.0, 1.0);
+            setDualParam(coreModel, "ParamArmL7", null, smoothParams.sekaiArmL7, 1.0);
+            setDualParam(coreModel, "ParamArmL8", null, smoothParams.sekaiArmL8, 1.0);
+            setDualParam(coreModel, "ParamArmL9", null, 0.9, 1.0);
+
+            setDualParam(coreModel, "ParamArmR1", null, smoothParams.sekaiArmR1, 1.0);
+            setDualParam(coreModel, "ParamArmR2", null, smoothParams.sekaiArmR2, 1.0);
+            setDualParam(coreModel, "ParamArmR3", null, smoothParams.sekaiArmR3, 1.0);
+            setDualParam(coreModel, "ParamArmR4", null, smoothParams.sekaiArmR4, 1.0);
+            setDualParam(coreModel, "ParamArmR5", null, smoothParams.sekaiArmR5, 1.0);
+            setDualParam(coreModel, "ParamArmR6", null, 1.0, 1.0);
+            setDualParam(coreModel, "ParamArmR7", null, smoothParams.sekaiArmR7, 1.0);
+            setDualParam(coreModel, "ParamArmR8", null, smoothParams.sekaiArmR8, 1.0);
+            setDualParam(coreModel, "ParamArmR9", null, 0.9, 1.0);
+
+            setDualParam(coreModel, "ParamFingerL", null, smoothParams.sekaiFingerL, 1.0);
+            setDualParam(coreModel, "ParamFingerR", null, smoothParams.sekaiFingerR, 1.0);
+            setSekaiHandSprite(coreModel, "L", activeHandL);
+            setSekaiHandSprite(coreModel, "R", activeHandR);
+          } else if (rigType === "haru4") {
+            setDualParam(coreModel, "ParamArmLA", null, smoothParams.armL, 0.9);
+            setDualParam(coreModel, "ParamArmRA", null, smoothParams.armR, 0.9);
+            setDualParam(coreModel, "ParamArmLB", null, smoothParams.armLB, 0.9);
+            setDualParam(coreModel, "ParamArmRB", null, smoothParams.armRB, 0.9);
+            setDualParam(coreModel, "ParamHandAngleL", null, smoothParams.handL, 0.85);
+            setDualParam(coreModel, "ParamHandAngleR", null, smoothParams.handR, 0.85);
+          }
+          // Nota: no modelo clássico (cubism2), deixamos os braços com a animação nativa (.mtn) sem sobrescrever
+
+          setDualParam(coreModel, "ParamEyeBallX", "PARAM_EYE_BALL_X", smoothParams.eyeBallX, 0.85);
+          setDualParam(coreModel, "ParamEyeBallY", "PARAM_EYE_BALL_Y", smoothParams.eyeBallY, 0.85);
+          setDualParam(coreModel, "ParamEyeLOpen", "PARAM_EYE_L_OPEN", smoothParams.eyeLOpen, 0.92);
+          setDualParam(coreModel, "ParamEyeROpen", "PARAM_EYE_R_OPEN", smoothParams.eyeROpen, 0.92);
+          setDualParam(coreModel, "ParamEyeLSmile", "PARAM_EYE_L_SMILE", smoothParams.eyeLSmile, 0.92);
+          setDualParam(coreModel, "ParamEyeRSmile", "PARAM_EYE_R_SMILE", smoothParams.eyeRSmile, 0.92);
+
+          setDualParam(coreModel, "ParamMouthForm", "PARAM_MOUTH_FORM", smoothParams.mouthForm, 0.92);
+          setDualParam(coreModel, "ParamBrowLY", "PARAM_BROW_L_Y", smoothParams.browLY, 0.9);
+          setDualParam(coreModel, "ParamBrowRY", "PARAM_BROW_R_Y", smoothParams.browRY, 0.9);
+          setDualParam(coreModel, "ParamBrowLAngle", "PARAM_BROW_L_ANGLE", smoothParams.browAngle, 0.85);
+          setDualParam(coreModel, "ParamBrowRAngle", "PARAM_BROW_R_ANGLE", smoothParams.browAngle, 0.85);
+          setDualParam(coreModel, "ParamCheek", "PARAM_TERE", smoothParams.cheek, 0.9);
+          setDualParam(coreModel, "ParamCheek", "PARAM_CHEEK", smoothParams.cheek, 0.9);
+
+          // LipSync sincronizado a 60 FPS
+          setDualParam(coreModel, "ParamMouthOpenY", "PARAM_MOUTH_OPEN_Y", currentMouthOpen, 1.0);
+          setDualParam(coreModel, "MouthOpen", "MOUTH_OPEN", currentMouthOpen, 1.0);
+        });
+      }
+
+      async function loadAvatarModel(modelPath) {
+        if (!app) return false;
+        loadingOverlay.classList.remove("hidden");
+        loadingText.textContent = "Carregando modelo Live2D...";
+
+        const primaryUrl = resolveModelUrl(modelPath);
+        const candidates = [primaryUrl];
+        if (primaryUrl !== MIKU_SEKAI_DEFAULT_MODEL) {
+          candidates.push(MIKU_SEKAI_DEFAULT_MODEL);
+        }
+        if (primaryUrl !== MIKU_CLASSIC_MODEL) {
+          candidates.push(MIKU_CLASSIC_MODEL);
+        }
+        if (primaryUrl !== HARU_FALLBACK_MODEL) {
+          candidates.push(HARU_FALLBACK_MODEL);
+        }
+
+        let loadedModel = null;
+        for (const url of candidates) {
+          try {
+            loadedModel = await PIXI.live2d.Live2DModel.from(url, {
+              autoInteract: false,
+              autoUpdate: true
+            });
+            if (loadedModel) {
+              console.log("[RinLive2D] Modelo carregado:", url);
+              break;
+            }
+          } catch (err) {
+            console.warn("[RinLive2D] Falha ao carregar", url, err);
+          }
+        }
+
+        if (!loadedModel) {
+          loadingText.textContent = "Não foi possível carregar o modelo Live2D.";
+          return false;
+        }
+
+        if (currentModel) {
+          app.stage.removeChild(currentModel);
+          try { currentModel.destroy(); } catch (_e) {}
+        }
+
+        currentModel = loadedModel;
+        app.stage.addChild(currentModel);
+        fitModelToStage();
+        setupModelController(currentModel);
+        applyEmotionToModel(currentEmotion);
+        loadingOverlay.classList.add("hidden");
+        updateHud();
+
+        postToHost({ type: "ready" });
+        return true;
+      }
+
+      function applyEmotionToModel(emotion) {
+        const key = String(emotion || "neutra").trim().toLowerCase();
+        currentEmotion = EMOTION_PRESETS[key] ? key : "neutra";
+        updateHud();
+
+        if (!currentModel) return;
+        const preset = EMOTION_PRESETS[currentEmotion];
+        try {
+          const expManager =
+            currentModel.internalModel &&
+            currentModel.internalModel.motionManager &&
+            currentModel.internalModel.motionManager.expressionManager;
+          if (expManager && Array.isArray(expManager.definitions)) {
+            for (const candidate of preset.expNames) {
+              const found = expManager.definitions.find(
+                (d) => d && (d.Name || d.name || "").toLowerCase() === candidate.toLowerCase()
+              );
+              if (found) {
+                currentModel.expression(found.Name || found.name);
+                break;
+              }
+            }
+          }
+        } catch (_e) {}
+      }
+
+      function setAvatarState(state) {
+        const raw = String(state || "idle").trim().toLowerCase();
+        if (raw === "inativa" || raw === "idle") {
+          currentState = "idle";
+        } else if (raw === "ouvindo" || raw === "listening") {
+          currentState = "listening";
+        } else if (raw === "pensando" || raw === "thinking") {
+          currentState = "thinking";
+        } else if (raw === "falando" || raw === "speaking") {
+          currentState = "speaking";
+        } else {
+          currentState = "idle";
+        }
+        if (currentState !== "speaking") {
+          targetMouthOpen = 0.0;
+        }
+        updateHud();
+      }
+
+      function setTransform(opts) {
+        if (!opts || typeof opts !== "object") return;
+        if (opts.zoom !== undefined) {
+          userZoom = Math.min(2.2, Math.max(0.45, Number(opts.zoom) || 1.0));
+        }
+        if (opts.offsetX !== undefined) {
+          userOffsetX = Number(opts.offsetX) || 0.0;
+        }
+        if (opts.offsetY !== undefined) {
+          userOffsetY = Number(opts.offsetY) || 0.0;
+        }
+        if (opts.lipSyncSensitivity !== undefined) {
+          lipSyncSensitivity = Math.min(3.0, Math.max(0.1, Number(opts.lipSyncSensitivity) || 1.0));
+        }
+        fitModelToStage();
+      }
+
+      function setMascotMode(active) {
+        isMascotMode = Boolean(active);
+        document.documentElement.classList.toggle("mascot-mode", isMascotMode);
+        document.body.classList.toggle("mascot-mode", isMascotMode);
+        fitModelToStage();
+      }
+
+      function setPaused(paused) {
+        isPaused = Boolean(paused);
+        if (app && app.ticker) {
+          if (isPaused) {
+            app.ticker.stop();
+          } else {
+            app.ticker.start();
+          }
+        }
+        updateHud();
+      }
+
+      document.getElementById("btn-mascot-chat").addEventListener("click", function (ev) {
+        ev.stopPropagation();
+        postToHost({ type: "toggle_mascot_chat" });
+      });
+      document.getElementById("btn-mascot-wave").addEventListener("click", function (ev) {
+        ev.stopPropagation();
+        triggerAction("acenar");
+      });
+      document.getElementById("btn-mascot-expand").addEventListener("click", function (ev) {
+        ev.stopPropagation();
+        postToHost({ type: "exit_mascot" });
+      });
+
+      window.addEventListener("pointermove", function (ev) {
+        if (isDraggingMascot) {
+          const dx = Math.abs(ev.screenX - dragStartScreenX);
+          const dy = Math.abs(ev.screenY - dragStartScreenY);
+          dragMovedPixels = Math.max(dragMovedPixels, dx + dy);
+          if (dragMovedPixels > 3) {
+            postToHost({
+              type: "drag_move",
+              screenX: Math.round(ev.screenX),
+              screenY: Math.round(ev.screenY)
+            });
+          }
+          return;
+        }
+        const rect = canvas.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return;
+        const x = (ev.clientX - rect.left) / rect.width;
+        const y = (ev.clientY - rect.top) / rect.height;
+        pointerNormX = Math.max(-1.0, Math.min(1.0, (x - 0.5) * 2.0));
+        pointerNormY = Math.max(-1.0, Math.min(1.0, (0.42 - y) * 2.0));
+        pointerActive = true;
+        pointerLastMoveMs = performance.now();
+      });
+
+      window.addEventListener("pointerup", function () {
+        if (isDraggingMascot) {
+          const wasClick = dragMovedPixels <= 5;
+          isDraggingMascot = false;
+          if (wasClick) {
+            triggerAction("acenar");
+          }
+        }
+      });
+
+      window.addEventListener("pointerleave", function () {
+        pointerActive = false;
+        isDraggingMascot = false;
+      });
+
+      canvas.addEventListener("pointerdown", function (ev) {
+        if (isMascotMode && ev.button === 0) {
+          isDraggingMascot = true;
+          dragMovedPixels = 0;
+          dragStartScreenX = ev.screenX;
+          dragStartScreenY = ev.screenY;
+          try {
+            canvas.setPointerCapture(ev.pointerId);
+          } catch (_e) {}
+          postToHost({
+            type: "drag_start",
+            screenX: Math.round(ev.screenX),
+            screenY: Math.round(ev.screenY)
+          });
+          return;
+        }
+        triggerAction("acenar");
+        if (!currentModel) return;
+        try {
+          const rect = canvas.getBoundingClientRect();
+          currentModel.tap(ev.clientX - rect.left, ev.clientY - rect.top);
+        } catch (_e) {}
+      });
+
+      canvas.addEventListener("dblclick", function () {
+        if (isMascotMode) {
+          postToHost({ type: "toggle_mascot_chat" });
+        }
+      });
+
+      canvas.addEventListener("wheel", function (ev) {
+        ev.preventDefault();
+        if (isMascotMode) {
+          postToHost({ type: "mascot_scale", delta: ev.deltaY < 0 ? 1 : -1 });
+          return;
+        }
+        const delta = ev.deltaY < 0 ? 0.07 : -0.07;
+        userZoom = Math.min(2.2, Math.max(0.45, userZoom + delta));
+        fitModelToStage();
+      }, { passive: false });
+
+      window.addEventListener("resize", function () {
+        if (!app) return;
+        app.renderer.resize(window.innerWidth, window.innerHeight);
+        fitModelToStage();
+      });
+
+      function handleHostMessage(payload) {
+        let data = payload;
+        if (typeof data === "string") {
+          try {
+            data = JSON.parse(data);
+          } catch (_e) {
+            return;
+          }
+        }
+        if (!data || typeof data !== "object") return;
+
+        switch (data.type) {
+          case "mouth":
+            feedAudioEnvelopeToWebAudio(data.value);
+            break;
+          case "emotion":
+            applyEmotionToModel(data.value);
+            break;
+          case "action":
+            triggerAction(data.value);
+            break;
+          case "state":
+            setAvatarState(data.value);
+            break;
+          case "transform":
+            setTransform(data);
+            break;
+          case "mascot":
+            setMascotMode(data.value);
+            break;
+          case "pause":
+            setPaused(data.value);
+            break;
+          case "model":
+            loadAvatarModel(data.value);
+            break;
+        }
+      }
+
+      if (window.chrome && window.chrome.webview) {
+        window.chrome.webview.addEventListener("message", function (ev) {
+          handleHostMessage(ev.data);
+        });
+      }
+
+      window.rinAvatar = {
+        setMouthOpen: feedAudioEnvelopeToWebAudio,
+        setEmotion: applyEmotionToModel,
+        triggerAction: triggerAction,
+        setState: setAvatarState,
+        setTransform: setTransform,
+        setMascotMode: setMascotMode,
+        setPaused: setPaused,
+        loadModel: loadAvatarModel,
+        connectAudioElement: connectAudioElement,
+        isPaused: function () { return isPaused; }
+      };
+
+      function init() {
+        ensureWebAudioAnalyser();
+        app = new PIXI.Application({
+          view: canvas,
+          autoStart: true,
+          backgroundAlpha: 0,
+          antialias: true,
+          autoDensity: true,
+          resolution: window.devicePixelRatio || 1,
+          width: window.innerWidth || 340,
+          height: window.innerHeight || 560
+        });
+
+        const params = new URLSearchParams(window.location.search);
+        const requestedModel = params.get("model") || MIKU_SEKAI_DEFAULT_MODEL;
+        loadAvatarModel(requestedModel);
+      }
+
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", init);
+      } else {
+        init();
+      }
+    })();
+  </script>
+</body>
+</html>

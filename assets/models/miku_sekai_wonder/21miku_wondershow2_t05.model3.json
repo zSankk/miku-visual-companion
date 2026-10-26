@@ -1,0 +1,134 @@
+{
+  "Version": 3,
+  "FileReferences": {
+    "Moc": "21miku_wondershow2_t05.moc3",
+    "Textures": [
+      "21miku_wondershow2_t05.2048/texture_00.png"
+    ],
+    "Physics": "21miku_wondershow2_t05.physics3.json",
+    "Motions": {
+      "Idle": [
+        {
+          "Name": "w-cute01-pose",
+          "File": "motions/w-cute01-pose.motion3.json",
+          "FadeInTime": 0.35,
+          "FadeOutTime": 0.35
+        },
+        {
+          "Name": "w-cute01-tilthead",
+          "File": "motions/w-cute01-tilthead.motion3.json",
+          "FadeInTime": 0.35,
+          "FadeOutTime": 0.35
+        },
+        {
+          "Name": "w-cute02-pose",
+          "File": "motions/w-cute02-pose.motion3.json",
+          "FadeInTime": 0.35,
+          "FadeOutTime": 0.35
+        }
+      ],
+      "Acenar": [
+        {
+          "Name": "w-adult01-shakehand",
+          "File": "motions/w-adult01-shakehand.motion3.json",
+          "FadeInTime": 0.35,
+          "FadeOutTime": 0.35
+        },
+        {
+          "Name": "w-cool01-shakehand",
+          "File": "motions/w-cool01-shakehand.motion3.json",
+          "FadeInTime": 0.35,
+          "FadeOutTime": 0.35
+        }
+      ],
+      "Feliz": [
+        {
+          "Name": "w-cute01-glad03",
+          "File": "motions/w-cute01-glad03.motion3.json",
+          "FadeInTime": 0.35,
+          "FadeOutTime": 0.35
+        },
+        {
+          "Name": "w-cute02-glad",
+          "File": "motions/w-cute02-glad.motion3.json",
+          "FadeInTime": 0.35,
+          "FadeOutTime": 0.35
+        }
+      ],
+      "Rir": [
+        {
+          "Name": "w-cute01-glad",
+          "File": "motions/w-cute01-glad.motion3.json",
+          "FadeInTime": 0.35,
+          "FadeOutTime": 0.35
+        },
+        {
+          "Name": "w-adult02-glad",
+          "File": "motions/w-adult02-glad.motion3.json",
+          "FadeInTime": 0.35,
+          "FadeOutTime": 0.35
+        }
+      ],
+      "Pensar": [
+        {
+          "Name": "w-adult01-think",
+          "File": "motions/w-adult01-think.motion3.json",
+          "FadeInTime": 0.35,
+          "FadeOutTime": 0.35
+        },
+        {
+          "Name": "w-adult05-think",
+          "File": "motions/w-adult05-think.motion3.json",
+          "FadeInTime": 0.35,
+          "FadeOutTime": 0.35
+        }
+      ],
+      "Bravo": [
+        {
+          "Name": "w-cool10-angry",
+          "File": "motions/w-cool10-angry.motion3.json",
+          "FadeInTime": 0.35,
+          "FadeOutTime": 0.35
+        },
+        {
+          "Name": "w-cute01-shakehead04",
+          "File": "motions/w-cute01-shakehead04.motion3.json",
+          "FadeInTime": 0.35,
+          "FadeOutTime": 0.35
+        }
+      ],
+      "Cantar": [
+        {
+          "Name": "w-cute01-wink04",
+          "File": "motions/w-cute01-wink04.motion3.json",
+          "FadeInTime": 0.35,
+          "FadeOutTime": 0.35
+        },
+        {
+          "Name": "w-cute02-guts",
+          "File": "motions/w-cute02-guts.motion3.json",
+          "FadeInTime": 0.35,
+          "FadeOutTime": 0.35
+        },
+        {
+          "Name": "w-cute01-nod04",
+          "File": "motions/w-cute01-nod04.motion3.json",
+          "FadeInTime": 0.35,
+          "FadeOutTime": 0.35
+        }
+      ]
+    }
+  },
+  "Groups": [
+    {
+      "Target": "Parameter",
+      "Name": "LipSync",
+      "Ids": []
+    },
+    {
+      "Target": "Parameter",
+      "Name": "EyeBlink",
+      "Ids": []
+    }
+  ]
+}

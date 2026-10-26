@@ -1,0 +1,44 @@
+# =====================================================================
+# Git Ignore - Miku Visual Companion
+# =====================================================================
+
+# Credenciais e segredos (NUNCA ENVIAR AO GITHUB)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Ambientes virtuais e pacotes
+.venv/
+venv/
+env/
+ENV/
+node_modules/
+
+# Caches e compilação Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Bancos de dados e armazenamento local
+*.db
+*.sqlite
+*.sqlite3
+data/
+!data/.gitkeep
+
+# Logs e arquivos temporários
+*.log
+*.tmp
+*.bak
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDEs e editores
+.vscode/
+.idea/
